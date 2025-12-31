@@ -25,10 +25,14 @@ export default tseslint.config(
 	globalIgnores([
 		"node_modules",
 		"dist",
+		"build",
+		"coverage",
 		"esbuild.config.mjs",
-		"eslint.config.js",
+		"eslint.config.mjs",
+		"vitest.config.ts",
 		"version-bump.mjs",
 		"versions.json",
 		"main.js",
+		"**/*.test.ts",
 	]),
 );

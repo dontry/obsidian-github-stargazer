@@ -1,0 +1,474 @@
+# GitHub GraphQL API Contracts
+
+**Feature**: GitHub Starred Repositories Manager
+**Date**: 2025-12-30
+**Phase**: 1 - Design & Contracts
+
+## Overview
+
+This document defines all GraphQL queries and mutations used by the plugin to interact with GitHub's GraphQL API. All queries use GitHub's official GraphQL endpoint: `https://api.github.com/graphql`
+
+## Authentication
+
+All requests must include an `Authorization` header with a valid GitHub personal access token:
+
+```
+Authorization: Bearer {githubToken}
+```
+
+Token scope requirements:
+- `read:org` (for starred repositories)
+- `repo` (for repository details and README)
+- `public_repo` (minimum, private repos require `repo`)
+
+---
+
+## Queries
+
+### 1. Fetch Starred Repositories
+
+Fetches the user's starred repositories with pagination. Returns repository metadata, README content, and owner information.
+
+**Query Name**: `GetStarredRepositories`
+
+**Variables**:
+```typescript
+{
+  cursor: string | null;  // Pagination cursor, null for first page
+  pageSize: number;       // Number of repos per page (default: 100, max: 100)
+}
+```
+
+**GraphQL Query**:
+```graphql
+query GetStarredRepositories($cursor: String, $pageSize: Int!) {
+  viewer {
+    starredRepositories(
+      first: $pageSize
+      after: $cursor
+      orderBy: {field: STARRED_AT, direction: DESC}
+    ) {
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+      edges {
+        node {
+          ... on Repository {
+            id
+            name
+            nameWithOwner
+            description
+            url
+            stargazerCount
+            primaryLanguage {
+              name
+            }
+            createdAt
+            updatedAt
+            pushedAt
+            owner {
+              login
+              url
+            }
+            readme: object(expression: "HEAD:README.md") {
+              ... on Blob {
+                text
+              }
+              ... on GitObject {
+                id
+              }
+            }
+            defaultBranchRef {
+              name
+            }
+          }
+        }
+        starredAt
+      }
+    }
+  }
+}
+```
+
+**Response Type**:
+```typescript
+interface StarredRepositoriesResponse {
+  viewer: {
+    starredRepositories: {
+      pageInfo: {
+        hasNextPage: boolean;
+        endCursor: string;
+      };
+      edges: Array<{
+        node: Repository;
+        starredAt: string; // ISO8601 datetime
+      }>;
+    };
+  };
+}
+
+interface Repository {
+  id: string;
+  name: string;
+  nameWithOwner: string;
+  description: string | null;
+  url: string;
+  stargazerCount: number;
+  primaryLanguage: {
+    name: string;
+  } | null;
+  createdAt: string; // ISO8601 datetime
+  updatedAt: string; // ISO8601 datetime
+  pushedAt: string; // ISO8601 datetime
+  owner: {
+    login: string;
+    url: string;
+  };
+  readme: {
+    text: string; // README.md content in markdown
+  } | null;
+  defaultBranchRef: {
+    name: string;
+  } | null;
+}
+```
+
+**Rate Limit Cost**: 1-5 points per page (depending on repository count)
+
+---
+
+### 2. Un-Star Repository (Batch)
+
+Removes the star from multiple repositories in batch. This is a mutation that updates the user's starred status.
+
+**Mutation Name**: `UnstarRepositories`
+
+**Note**: GitHub GraphQL API does not support batch un-star in a single mutation. Each repository must be un-starred individually. However, we can optimize by sending multiple mutations in parallel.
+
+**Variables**:
+```typescript
+{
+  repositoryIds: string[];  // Array of repository IDs to un-star
+}
+```
+
+**GraphQL Mutation** (single repository):
+```graphql
+mutation UnstarRepository($repositoryId: ID!) {
+  removeStar(input: {starrableId: $repositoryId}) {
+    clientMutationId
+  }
+}
+```
+
+**Request Type**:
+```typescript
+interface UnstarRepositoryVariables {
+  repositoryId: string;
+}
+
+interface UnstarRepositoryResponse {
+  removeStar: {
+    clientMutationId: string;
+  };
+}
+```
+
+**Batch Strategy**:
+- Execute multiple `UnstarRepository` mutations in parallel (limit to 10 concurrent requests)
+- Track progress: completed count / total count
+- On failure: log error, continue with remaining repos
+
+**Rate Limit Cost**: ~1 point per repository
+
+---
+
+### 3. Fetch Repository by ID
+
+Fetches a single repository by its GitHub node ID. Used for refreshing individual repository data.
+
+**Query Name**: `GetRepositoryById`
+
+**Variables**:
+```typescript
+{
+  repositoryId: string;  // GitHub node ID
+}
+```
+
+**GraphQL Query**:
+```graphql
+query GetRepositoryById($repositoryId: ID!) {
+  node(id: $repositoryId) {
+    ... on Repository {
+      id
+      name
+      nameWithOwner
+      description
+      url
+      stargazerCount
+      primaryLanguage {
+        name
+      }
+      createdAt
+      updatedAt
+      pushedAt
+      owner {
+        login
+        url
+      }
+      readme: object(expression: "HEAD:README.md") {
+        ... on Blob {
+          text
+        }
+      }
+      defaultBranchRef {
+        name
+      }
+    }
+  }
+}
+```
+
+**Response Type**:
+```typescript
+interface RepositoryByIdResponse {
+  node: Repository | null;
+}
+```
+
+**Rate Limit Cost**: 1 point
+
+---
+
+## Error Handling
+
+### Query Errors
+
+All queries should handle these error scenarios:
+
+1. **Authentication Error** (401):
+   - Token is invalid or expired
+   - User action: Re-authenticate with new token
+   - Display: "Authentication failed. Please check your GitHub token in settings."
+
+2. **Rate Limit Exceeded** (403):
+   - Too many API requests
+   - User action: Wait for rate limit reset (check `X-RateLimit-Reset` header)
+   - Display: "Rate limit exceeded. Please wait {minutes} minutes before syncing again."
+
+3. **Network Error**:
+   - No internet connection
+   - User action: Check network connection
+   - Display: "Network error. Please check your connection and try again."
+
+4. **GraphQL Errors** (partial errors in response):
+   - Some fields failed to load
+   - Action: Log error, use partial data if safe
+   - Display: "Some repositories could not be fully loaded. Please try again."
+
+### Error Response Format
+
+```typescript
+interface GraphQLError {
+  message: string;
+  path: (string | number)[];  // Path to field that caused error
+  extensions?: {
+    code?: string;
+    type?: string;
+  };
+}
+
+interface GraphQLResponse<T> {
+  data?: T;
+  errors?: GraphQLError[];
+}
+```
+
+---
+
+## Rate Limiting
+
+### Rate Limit Headers
+
+GitHub returns rate limit information in response headers:
+
+```
+X-RateLimit-Limit: 5000
+X-RateLimit-Remaining: 4950
+X-RateLimit-Reset: 1735648800
+X-RateLimit-Used: 50
+```
+
+Parse these headers to track remaining quota:
+
+```typescript
+interface RateLimitInfo {
+  limit: number;
+  remaining: number;
+  used: number;
+  resetAt: Date;  // Unix timestamp converted to Date
+}
+```
+
+### Rate Limit Strategy
+
+1. **Before Each Query**:
+   - Check `remaining` points
+   - If `remaining < 100` (20% of limit), add delay before next query
+   - Delay calculation: `((resetAt - now) / remaining) * safety_factor`
+
+2. **On Rate Limit Error** (429):
+   - Parse `Retry-After` header if present
+   - Calculate wait time: `resetAt - now` (from `X-RateLimit-Reset`)
+   - Exponential backoff: wait 1s, 2s, 4s, 8s, max 30s
+   - Retry query after wait
+
+3. **Query Cost Estimation**:
+   - `GetStarredRepositories`: ~1-5 points per page
+   - `UnstarRepository`: ~1 point per repo
+   - `GetRepositoryById`: ~1 point per repo
+
+---
+
+## TypeScript Types
+
+Export these types for use in the plugin:
+
+```typescript
+// types.ts
+
+export interface GitHubRepository {
+  id: string;
+  name: string;
+  nameWithOwner: string;
+  description: string | null;
+  url: string;
+  starCount: number;
+  primaryLanguage: string | null;
+  createdAt: string;
+  updatedAt: string;
+  pushedAt: string;
+  owner: {
+    login: string;
+    url: string;
+  };
+  readme: string | null;
+  defaultBranch: string | null;
+}
+
+export interface GitHubGraphQLClient {
+  getStarredRepositories(
+    cursor: string | null,
+    pageSize: number
+  ): Promise<StarredRepositoriesResponse>;
+
+  unstarRepository(repositoryId: string): Promise<void>;
+
+  getRepositoryById(repositoryId: string): Promise<GitHubRepository | null>;
+}
+
+export interface RateLimitTracker {
+  getRemaining(): number;
+  getResetTime(): Date;
+  shouldThrottle(): boolean;
+  waitForReset(): Promise<void>;
+}
+```
+
+---
+
+## Query Execution Example
+
+```typescript
+async function fetchAllStarredRepositories(
+  client: GitHubGraphQLClient,
+  maxRepos: number = 1000
+): Promise<GitHubRepository[]> {
+  const repositories: GitHubRepository[] = [];
+  let cursor: string | null = null;
+  let pageCount = 0;
+
+  while (repositories.length < maxRepos) {
+    // Check rate limit before query
+    if (client.shouldThrottle()) {
+      await client.waitForReset();
+    }
+
+    const response = await client.getStarredRepositories(cursor, 100);
+
+    repositories.push(...response.viewer.starredRepositories.edges.map(e => ({
+      ...e.node,
+      starredAt: e.starredAt
+    })));
+
+    if (!response.viewer.starredRepositories.pageInfo.hasNextPage) {
+      break;
+    }
+
+    cursor = response.viewer.starredRepositories.pageInfo.endCursor;
+    pageCount++;
+
+    // Safety limit
+    if (pageCount > 20) {
+      throw new Error('Exceeded maximum page count');
+    }
+  }
+
+  return repositories;
+}
+```
+
+---
+
+## Testing
+
+### Contract Tests
+
+Verify GitHub GraphQL API responses match expected types:
+
+```typescript
+describe('GitHub GraphQL Contract', () => {
+  it('should return starred repositories with expected fields', async () => {
+    const response = await client.getStarredRepositories(null, 10);
+
+    expect(response.viewer.starredRepositories.edges).toBeInstanceOf(Array);
+    expect(response.viewer.starredRepositories.edges[0].node).toMatchObject({
+      id: expect.any(String),
+      name: expect.any(String),
+      nameWithOwner: expect.any(String),
+      url: expect.any(String),
+      stargazerCount: expect.any(Number),
+      createdAt: expect.any(String),
+      updatedAt: expect.any(String),
+    });
+  });
+
+  it('should include rate limit headers', async () => {
+    const response = await client.getStarredRepositories(null, 10);
+
+    expect(response.headers['x-ratelimit-limit']).toBeDefined();
+    expect(response.headers['x-ratelimit-remaining']).toBeDefined();
+    expect(response.headers['x-ratelimit-reset']).toBeDefined();
+  });
+});
+```
+
+---
+
+## Summary
+
+| Query/Mutation | Purpose | Cost | Pagination |
+|----------------|---------|------|------------|
+| `GetStarredRepositories` | Fetch starred repos | 1-5 pts/page | Cursor-based |
+| `UnstarRepository` | Un-star a repo | ~1 pt | N/A (single) |
+| `GetRepositoryById` | Fetch single repo | ~1 pt | N/A |
+
+**Total Estimated Cost for Initial Sync** (100 repos):
+- 1 page query: ~5 points
+- Total: 5 points out of 5,000 (0.1% of hourly limit)
+
+**Total Estimated Cost for Batch Un-star** (50 repos):
+- 50 individual mutations: ~50 points
+- Total: 50 points out of 5,000 (1% of hourly limit)

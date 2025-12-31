@@ -1,99 +1,152 @@
-import {App, Editor, MarkdownView, Modal, Notice, Plugin} from 'obsidian';
-import {DEFAULT_SETTINGS, MyPluginSettings, SampleSettingTab} from "./settings";
+import { Plugin, Notice } from 'obsidian';
+import { SettingsStore } from '@/storage/settings-store';
+import { RepositoryStore } from '@/storage/repository-store';
+import { SyncStateStore } from '@/storage/sync-state-store';
+import { SyncCommand } from '@/commands/sync-command';
+import { GitHubStargazerSettingTab } from '@/ui/settings-tab';
+import { COMMAND_IDS, COMMAND_NAMES } from '@/utils/constants';
+import { PluginSettings } from '@/types';
 
-// Remember to rename these classes and interfaces!
-
-export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
+/**
+ * GitHub Stargazer Plugin
+ * Sync and manage GitHub starred repositories in Obsidian
+ */
+export default class GitHubStargazerPlugin extends Plugin {
+	private settingsStore: SettingsStore;
+	private repositoryStore: RepositoryStore;
+	private syncStateStore: SyncStateStore;
+	private syncCommand: SyncCommand;
+	private settings: PluginSettings;
 
 	async onload() {
-		await this.loadSettings();
+		console.log('Loading GitHub Stargazer plugin');
 
-		// This creates an icon in the left ribbon.
-		this.addRibbonIcon('dice', 'Sample', (evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
+		// Initialize stores
+		this.settingsStore = new SettingsStore(this.app);
+		this.repositoryStore = new RepositoryStore(this.app);
+		this.syncStateStore = new SyncStateStore(this.app);
+
+		// Load settings
+		await this.settingsStore.loadSettings();
+		this.settings = this.settingsStore.getAll() as PluginSettings;
+
+		// Initialize sync command
+		this.syncCommand = new SyncCommand();
+
+		// Register commands
+		this.registerCommands();
+
+		// Register settings tab
+		this.addSettingTab(new GitHubStargazerSettingTab(this.app, this));
+
+		// Add ribbon icon
+		this.addRibbonIcon('star', 'GitHub Stargazer', (evt: MouseEvent) => {
+			this.syncRepositories();
 		});
 
-		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status bar text');
-
-		// This adds a simple command that can be triggered anywhere
-		this.addCommand({
-			id: 'open-modal-simple',
-			name: 'Open modal (simple)',
-			callback: () => {
-				new SampleModal(this.app).open();
-			}
-		});
-		// This adds an editor command that can perform some operation on the current editor instance
-		this.addCommand({
-			id: 'replace-selected',
-			name: 'Replace selected content',
-			editorCallback: (editor: Editor, view: MarkdownView) => {
-				editor.replaceSelection('Sample editor command');
-			}
-		});
-		// This adds a complex command that can check whether the current state of the app allows execution of the command
-		this.addCommand({
-			id: 'open-modal-complex',
-			name: 'Open modal (complex)',
-			checkCallback: (checking: boolean) => {
-				// Conditions to check
-				const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
-					if (!checking) {
-						new SampleModal(this.app).open();
-					}
-
-					// This command will only show up in Command Palette when the check function returns true
-					return true;
-				}
-				return false;
-			}
-		});
-
-		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
-
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			new Notice("Click");
-		});
-
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
-
+		// Auto-sync if enabled
+		if (this.settings.autoSyncEnabled) {
+			// Perform initial sync after a short delay
+			setTimeout(() => {
+				this.syncRepositories();
+			}, 5000);
+		}
 	}
 
 	onunload() {
+		console.log('Unloading GitHub Stargazer plugin');
 	}
 
-	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData() as Partial<MyPluginSettings>);
+	/**
+	 * Register all plugin commands
+	 */
+	private registerCommands() {
+		// Sync starred repositories command (incremental)
+		this.addCommand({
+			id: COMMAND_IDS.SYNC,
+			name: COMMAND_NAMES.SYNC,
+			callback: () => {
+				this.syncRepositories('incremental');
+			},
+		});
+
+		// Force full sync command
+		this.addCommand({
+			id: COMMAND_IDS.SYNC + '-force',
+			name: COMMAND_NAMES.SYNC + ' (Force Full Sync)',
+			callback: () => {
+				this.syncRepositories('initial');
+			},
+		});
+
+		// Open repository view command
+		this.addCommand({
+			id: COMMAND_IDS.OPEN_VIEW,
+			name: COMMAND_NAMES.OPEN_VIEW,
+			callback: () => {
+				new Notice('Repository view coming soon!');
+			},
+		});
+
+		// Batch un-star repositories command
+		this.addCommand({
+			id: COMMAND_IDS.BATCH_UNSTAR,
+			name: COMMAND_NAMES.BATCH_UNSTAR,
+			callback: () => {
+				new Notice('Batch un-star coming soon!');
+			},
+		});
 	}
 
-	async saveSettings() {
-		await this.saveData(this.settings);
-	}
-}
+	/**
+	 * Sync repositories from GitHub
+	 */
+	private async syncRepositories(mode: 'initial' | 'incremental' = 'incremental') {
+		if (!this.settings.githubToken || this.settings.githubToken.trim() === '') {
+			new Notice(
+				'Please configure your GitHub token in settings first. Open Settings → Community plugins → GitHub Stargazer.'
+			);
+			return;
+		}
 
-class SampleModal extends Modal {
-	constructor(app: App) {
-		super(app);
+		try {
+			await this.syncCommand.execute(
+				this.settings.githubToken,
+				this.repositoryStore,
+				this.syncStateStore,
+				mode
+			);
+		} catch (error) {
+			// Error is already handled by syncCommand, but we can add additional logging here
+			console.error('[GitHub Stargazer] Sync error:', error);
+		}
 	}
 
-	onOpen() {
-		let {contentEl} = this;
-		contentEl.setText('Woah!');
+	/**
+	 * Get settings store instance
+	 */
+	getSettingsStore(): SettingsStore {
+		return this.settingsStore;
 	}
 
-	onClose() {
-		const {contentEl} = this;
-		contentEl.empty();
+	/**
+	 * Get repository store instance
+	 */
+	getRepositoryStore(): RepositoryStore {
+		return this.repositoryStore;
+	}
+
+	/**
+	 * Get sync state store instance
+	 */
+	getSyncStateStore(): SyncStateStore {
+		return this.syncStateStore;
+	}
+
+	/**
+	 * Save settings
+	 */
+	async saveSettings(): Promise<void> {
+		await this.settingsStore.saveAll(this.settings);
 	}
 }

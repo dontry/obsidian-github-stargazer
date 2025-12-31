@@ -1,11 +1,15 @@
-import { App, Notice } from 'obsidian';
-import { PluginSettings } from '@/types';
+import type { Plugin as ObsidianPlugin } from "obsidian";
+import { Notice } from "obsidian";
+import type { PluginSettings } from "@/types";
+
+const isTestEnvironment = () =>
+	typeof process !== "undefined" && process.env?.NODE_ENV === "test";
 
 /**
  * Default plugin settings
  */
 const DEFAULT_SETTINGS: PluginSettings = {
-	githubToken: '',
+	githubToken: "",
 	autoSyncEnabled: false,
 	autoSyncIntervalMinutes: 60,
 	lastSyncAt: null,
@@ -17,11 +21,11 @@ const DEFAULT_SETTINGS: PluginSettings = {
  * Uses Obsidian's data API for secure storage
  */
 export class SettingsStore {
-	private app: App;
+	private plugin: ObsidianPlugin;
 	private settings: PluginSettings;
 
-	constructor(app: App) {
-		this.app = app;
+	constructor(plugin: ObsidianPlugin) {
+		this.plugin = plugin;
 		this.settings = { ...DEFAULT_SETTINGS };
 	}
 
@@ -30,18 +34,21 @@ export class SettingsStore {
 	 */
 	async loadSettings(): Promise<void> {
 		try {
-			const savedData = await this.app.loadData();
+			// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+			const savedData = await this.plugin.loadData();
 			if (savedData) {
 				// Merge saved settings with defaults to handle new fields
+				// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 				this.settings = {
 					...DEFAULT_SETTINGS,
 					...savedData,
-					// Ensure nested objects are properly merged if needed
 				};
 			}
 		} catch (error) {
-			new Notice('Failed to load settings. Using defaults.');
-			console.error('Failed to load settings:', error);
+			if (!isTestEnvironment()) {
+				new Notice("Failed to load settings. Using defaults.");
+				console.error("Failed to load settings:", error);
+			}
 			this.settings = { ...DEFAULT_SETTINGS };
 		}
 	}
@@ -51,10 +58,12 @@ export class SettingsStore {
 	 */
 	async saveSettings(): Promise<void> {
 		try {
-			await this.app.saveData(this.settings);
+			await this.plugin.saveData(this.settings);
 		} catch (error) {
-			new Notice('Failed to save settings.');
-			console.error('Failed to save settings:', error);
+			if (!isTestEnvironment()) {
+				new Notice("Failed to save settings.");
+				console.error("Failed to save settings:", error);
+			}
 			throw error;
 		}
 	}
@@ -78,7 +87,7 @@ export class SettingsStore {
 	 */
 	async set<K extends keyof PluginSettings>(
 		key: K,
-		value: PluginSettings[K]
+		value: PluginSettings[K],
 	): Promise<void> {
 		this.settings[key] = value;
 		await this.saveSettings();
@@ -101,7 +110,9 @@ export class SettingsStore {
 	async resetToDefaults(): Promise<void> {
 		this.settings = { ...DEFAULT_SETTINGS };
 		await this.saveSettings();
-		new Notice('Settings reset to defaults.');
+		if (!isTestEnvironment()) {
+			new Notice("Settings reset to defaults.");
+		}
 	}
 
 	/**
@@ -109,14 +120,17 @@ export class SettingsStore {
 	 */
 	validateGitHubToken(token: string): { valid: boolean; error?: string } {
 		if (!token) {
-			return { valid: false, error: 'GitHub token is required.' };
+			return { valid: false, error: "GitHub token is required." };
 		}
 
 		if (token.length < 40) {
-			return { valid: false, error: 'GitHub token must be at least 40 characters.' };
+			return {
+				valid: false,
+				error: "GitHub token must be at least 40 characters.",
+			};
 		}
 
-		if (!token.startsWith('ghp_')) {
+		if (!token.startsWith("ghp_")) {
 			return { valid: false, error: 'GitHub token must start with "ghp_".' };
 		}
 

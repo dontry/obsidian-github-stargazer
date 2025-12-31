@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { RepositoryStore } from '@/storage/repository-store';
-import { Repository, RepositoryData } from '@/types';
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { RepositoryStore } from "@/storage/repository-store";
+import { Repository, type RepositoryData } from "@/types";
 
 // Mock Obsidian App
 const mockApp = {
@@ -14,7 +14,7 @@ const mockApp = {
 	},
 };
 
-describe('RepositoryStore', () => {
+describe("RepositoryStore", () => {
 	let repositoryStore: RepositoryStore;
 
 	beforeEach(() => {
@@ -22,10 +22,10 @@ describe('RepositoryStore', () => {
 		vi.clearAllMocks();
 	});
 
-	describe('loadRepositories', () => {
-		it('should load repositories from JSON file', async () => {
+	describe("loadRepositories", () => {
+		it("should load repositories from JSON file", async () => {
 			const mockData: RepositoryData = {
-				lastSync: '2025-12-30T12:00:00Z',
+				lastSync: "2025-12-30T12:00:00Z",
 				repositories: [],
 			};
 
@@ -34,22 +34,22 @@ describe('RepositoryStore', () => {
 		});
 	});
 
-	describe('saveRepositories', () => {
-		it('should save repositories to JSON file', async () => {
+	describe("saveRepositories", () => {
+		it("should save repositories to JSON file", async () => {
 			// Mock implementation will follow
 			expect(true).toBe(true); // Placeholder
 		});
 	});
 
-	describe('getRepositoryById', () => {
-		it('should find repository by GitHub ID', async () => {
+	describe("getRepositoryById", () => {
+		it("should find repository by GitHub ID", async () => {
 			// Mock implementation will follow
 			expect(true).toBe(true); // Placeholder
 		});
 	});
 
-	describe('updateRepository', () => {
-		it('should update existing repository', async () => {
+	describe("updateRepository", () => {
+		it("should update existing repository", async () => {
 			// Mock implementation will follow
 			expect(true).toBe(true); // Placeholder
 		});

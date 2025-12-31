@@ -1,25 +1,25 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { GitHubGraphQLClient } from '@/sync/github-client';
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { GitHubGraphQLClient } from "@/sync/github-client";
 
 global.fetch = vi.fn();
 
-describe('GitHubGraphQLClient', () => {
+describe("GitHubGraphQLClient", () => {
 	let client: GitHubGraphQLClient;
-	const mockToken = 'ghp_test_token_123456789012345678901234567890';
+	const mockToken = "ghp_test_token_123456789012345678901234567890";
 
 	beforeEach(() => {
 		client = new GitHubGraphQLClient(mockToken);
 		vi.clearAllMocks();
 	});
 
-	describe('fetchStarredRepositories', () => {
-		it('should fetch starred repositories with pagination', async () => {
+	describe("fetchStarredRepositories", () => {
+		it("should fetch starred repositories with pagination", async () => {
 			const mockResponse = {
 				viewer: {
 					starredRepositories: {
 						pageInfo: {
 							hasNextPage: false,
-							endCursor: 'cursor123',
+							endCursor: "cursor123",
 						},
 						edges: [],
 					},
@@ -34,18 +34,18 @@ describe('GitHubGraphQLClient', () => {
 			const result = await client.fetchStarredRepositories(null, 10);
 
 			expect(fetch).toHaveBeenCalledWith(
-				'https://api.github.com/graphql',
+				"https://api.github.com/graphql",
 				expect.objectContaining({
-					method: 'POST',
+					method: "POST",
 					headers: {
 						Authorization: `Bearer ${mockToken}`,
-						'Content-Type': 'application/json',
+						"Content-Type": "application/json",
 					},
-				})
+				}),
 			);
 		});
 
-		it('should handle authentication errors', async () => {
+		it("should handle authentication errors", async () => {
 			vi.mocked(fetch).mockResolvedValue({
 				ok: false,
 				status: 401,
@@ -55,12 +55,12 @@ describe('GitHubGraphQLClient', () => {
 		});
 	});
 
-	describe('unstarRepository', () => {
-		it('should send unstar mutation', async () => {
+	describe("unstarRepository", () => {
+		it("should send unstar mutation", async () => {
 			const mockResponse = {
 				data: {
 					removeStar: {
-						clientMutationId: 'id123',
+						clientMutationId: "id123",
 					},
 				},
 			};
@@ -70,7 +70,7 @@ describe('GitHubGraphQLClient', () => {
 				json: async () => mockResponse,
 			} as Response);
 
-			await client.unstarRepository('MDEwOlJlcG9zaXRvcnkxMjM0NTY3ODkw');
+			await client.unstarRepository("MDEwOlJlcG9zaXRvcnkxMjM0NTY3ODkw");
 
 			expect(fetch).toHaveBeenCalled();
 		});

@@ -1,5 +1,5 @@
-import { App } from 'obsidian';
-import { Repository, RepositoryData } from '@/types';
+import type { App } from "obsidian";
+import type { Repository, RepositoryData } from "@/types";
 
 /**
  * Storage layer for repository data
@@ -8,7 +8,7 @@ import { Repository, RepositoryData } from '@/types';
  * data storage API.
  */
 export class RepositoryStore {
-	private readonly DATA_FILE = 'github-starred-repos.json';
+	private readonly DATA_FILE = "github-starred-repos.json";
 	private app: App;
 	private cache: Repository[] | null = null;
 
@@ -71,7 +71,9 @@ export class RepositoryStore {
 	 */
 	async updateRepository(repository: Repository): Promise<void> {
 		const data = await this.loadRepositories();
-		const index = data.repositories.findIndex((repo) => repo.id === repository.id);
+		const index = data.repositories.findIndex(
+			(repo) => repo.id === repository.id,
+		);
 
 		if (index !== -1) {
 			data.repositories[index] = repository;

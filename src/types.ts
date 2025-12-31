@@ -103,14 +103,24 @@ export interface PluginSettings {
 export interface SyncState {
 	/** Whether sync is currently in progress */
 	isSyncing: boolean;
-	/** Number of repos processed in current sync */
-	syncProgress: number;
-	/** Total number of repos to sync */
-	syncTotal: number;
-	/** Last sync error message (optional) */
-	lastError: string | null;
-	/** Last successful sync completion (ISO8601, optional) */
-	syncedAt: string | null;
+	/** Timestamp of the last sync attempt */
+	lastSync: string | null;
+	/** Current step description */
+	currentStep: string;
+	/** Number of repositories processed in current sync */
+	repositoriesProcessed: number;
+	/** Total number of repositories involved in current sync */
+	totalRepositories: number;
+	/** Percentage complete for current sync */
+	percentageComplete: number;
+	/** Last error message, if any */
+	error: string | null;
+	/** Sync start time */
+	startTime: string | null;
+	/** Sync completion time */
+	endTime: string | null;
+	/** Duration of the last sync in seconds */
+	duration: number | null;
 }
 
 /**
@@ -146,7 +156,7 @@ export interface RateLimitInfo {
  */
 export interface RepositoryData {
 	/** Last sync timestamp (ISO8601) */
-	lastSync: string;
+	lastSync: string | null;
 	/** Array of repository objects */
 	repositories: Repository[];
 }

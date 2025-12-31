@@ -1,90 +1,172 @@
-# Obsidian Sample Plugin
+# GitHub Stargazer
 
-This is a sample plugin for Obsidian (https://obsidian.md).
+An Obsidian plugin that syncs and manages your GitHub starred repositories directly in your vault. Keep track of interesting projects, add personal notes, tag them for easy discovery, and build your personal knowledge base of useful code repositories.
 
-This project uses TypeScript to provide type checking and documentation.
-The repo depends on the latest plugin API (obsidian.d.ts) in TypeScript Definition format, which contains TSDoc comments describing what it does.
+## Features
 
-This sample plugin demonstrates some of the basic functionality the plugin API can do.
-- Adds a ribbon icon, which shows a Notice when clicked.
-- Adds a command "Open modal (simple)" which opens a Modal.
-- Adds a plugin setting tab to the settings page.
-- Registers a global click event and output 'click' to the console.
-- Registers a global interval which logs 'setInterval' to the console.
+- **Sync Starred Repositories** - Automatically fetch all repositories you've starred on GitHub using the GraphQL API
+- **Repository Information** - Store comprehensive metadata including:
+  - Repository name, description, and URL
+  - Star count and primary programming language
+  - Owner information and creation dates
+  - README.md content in markdown format
+  - When you starred the repository
+- **Custom Tags** - Organize repositories with custom tags and color coding
+- **Personal Notes** - Add markdown notes to any repository for personal reference
+- **Linked Resources** - Attach links to external documentation, tutorials, or related resources
+- **Auto-Sync** - Optional automatic synchronization on plugin load and at configurable intervals
+- **Sync Modes** - Choose between incremental updates or full re-sync
+- **Keep Unstarred** - Preserve local copies of repositories even after un-starring them on GitHub
+- **Smart Caching** - Efficient data storage and retrieval with configurable cache limits
 
-## First time developing plugins?
+## Installation
 
-Quick starting guide for new plugin devs:
+### From Release (Recommended)
 
-- Check if [someone already developed a plugin for what you want](https://obsidian.md/plugins)! There might be an existing plugin similar enough that you can partner up with.
-- Make a copy of this repo as a template with the "Use this template" button (login to GitHub if you don't see it).
-- Clone your repo to a local development folder. For convenience, you can place this folder in your `.obsidian/plugins/your-plugin-name` folder.
-- Install NodeJS, then run `npm i` in the command line under your repo folder.
-- Run `npm run dev` to compile your plugin from `main.ts` to `main.js`.
-- Make changes to `main.ts` (or create new `.ts` files). Those changes should be automatically compiled into `main.js`.
-- Reload Obsidian to load the new version of your plugin.
-- Enable plugin in settings window.
-- For updates to the Obsidian API run `npm update` in the command line under your repo folder.
+1. Download the latest release from the [Releases](https://github.com/yourusername/obsidian-github-stargazer/releases) page
+2. Extract the files to your vault's `.obsidian/plugins/github-stargazer/` directory
+3. Enable the plugin in Obsidian's Community Plugins settings
 
-## Releasing new releases
+### From Source
 
-- Update your `manifest.json` with your new version number, such as `1.0.1`, and the minimum Obsidian version required for your latest release.
-- Update your `versions.json` file with `"new-plugin-version": "minimum-obsidian-version"` so older versions of Obsidian can download an older version of your plugin that's compatible.
-- Create new GitHub release using your new version number as the "Tag version". Use the exact version number, don't include a prefix `v`. See here for an example: https://github.com/obsidianmd/obsidian-sample-plugin/releases
-- Upload the files `manifest.json`, `main.js`, `styles.css` as binary attachments. Note: The manifest.json file must be in two places, first the root path of your repository and also in the release.
-- Publish the release.
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/obsidian-github-stargazer.git
+cd obsidian-github-stargazer
 
-> You can simplify the version bump process by running `npm version patch`, `npm version minor` or `npm version major` after updating `minAppVersion` manually in `manifest.json`.
-> The command will bump version in `manifest.json` and `package.json`, and add the entry for the new version to `versions.json`
+# Install dependencies
+pnpm install
 
-## Adding your plugin to the community plugin list
+# Build the plugin
+pnpm run build
 
-- Check the [plugin guidelines](https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines).
-- Publish an initial version.
-- Make sure you have a `README.md` file in the root of your repo.
-- Make a pull request at https://github.com/obsidianmd/obsidian-releases to add your plugin.
-
-## How to use
-
-- Clone this repo.
-- Make sure your NodeJS is at least v16 (`node --version`).
-- `npm i` or `yarn` to install dependencies.
-- `npm run dev` to start compilation in watch mode.
-
-## Manually installing the plugin
-
-- Copy over `main.js`, `styles.css`, `manifest.json` to your vault `VaultFolder/.obsidian/plugins/your-plugin-id/`.
-
-## Improve code quality with eslint
-- [ESLint](https://eslint.org/) is a tool that analyzes your code to quickly find problems. You can run ESLint against your plugin to find common bugs and ways to improve your code. 
-- This project already has eslint preconfigured, you can invoke a check by running`npm run lint`
-- Together with a custom eslint [plugin](https://github.com/eslint-plugin) for Obsidan specific code guidelines.
-- A GitHub action is preconfigured to automatically lint every commit on all branches.
-
-## Funding URL
-
-You can include funding URLs where people who use your plugin can financially support it.
-
-The simple way is to set the `fundingUrl` field to your link in your `manifest.json` file:
-
-```json
-{
-    "fundingUrl": "https://buymeacoffee.com"
-}
+# Copy files to your vault
+cp main.js manifest.json .obsidian/plugins/github-stargazer/
+cp styles.css .obsidian/plugins/github-stargazer/  # if present
 ```
 
-If you have multiple URLs, you can also do:
+## Setup
 
-```json
-{
-    "fundingUrl": {
-        "Buy Me a Coffee": "https://buymeacoffee.com",
-        "GitHub Sponsor": "https://github.com/sponsors",
-        "Patreon": "https://www.patreon.com/"
-    }
-}
+1. **Generate a GitHub Personal Access Token**
+   - Go to GitHub Settings → Developer settings → Personal access tokens → Tokens (classic)
+   - Create a new token with `read:org` and `public_repo` scopes (or `repo` for private repositories)
+   - Copy the token
+
+2. **Configure the Plugin**
+   - Open Obsidian Settings → Community Plugins → GitHub Stargazer
+   - Paste your GitHub token
+   - Configure auto-sync preferences (optional)
+
+3. **Start Syncing**
+   - Click the ribbon icon (star icon) or use the command palette
+   - Choose "Sync Starred Repositories" for incremental sync
+   - Choose "Sync Starred Repositories (Force Full Sync)" to fetch all data
+
+## Usage
+
+### Commands
+
+- **Sync Starred Repositories** - Incrementally sync new or updated repositories
+- **Sync Starred Repositories (Force Full Sync)** - Re-sync all repositories from scratch
+- **Open Repository View** - View and browse your synced repositories (coming soon)
+- **Batch Un-star** - Manage and batch un-star repositories (coming soon)
+
+### Managing Repositories
+
+Once synced, you can:
+- **Browse** all your starred repositories in an organized view
+- **Add Notes** - Write personal notes about why you starred a repo or how you use it
+- **Apply Tags** - Create custom tags to categorize repositories by technology, use case, or any system you prefer
+- **Link Resources** - Attach links to blog posts, tutorials, or documentation related to the repository
+- **Search** - Quickly find repositories by name, tags, or notes
+
+## Development
+
+### Prerequisites
+
+- Node.js >= 18.0.0
+- pnpm >= 9.0.0
+- TypeScript 5.3+
+
+### Building
+
+```bash
+# Install dependencies
+pnpm install
+
+# Development mode with hot reload
+pnpm run dev
+
+# Production build
+pnpm run build
+
+# Run tests
+pnpm test
+
+# Run tests with UI
+pnpm run test:ui
+
+# Run tests with coverage
+pnpm run test:coverage
+
+# Lint code
+pnpm run lint
 ```
 
-## API Documentation
+### Project Structure
 
-See https://docs.obsidian.md
+```
+src/
+├── commands/          # Command implementations (sync, etc.)
+├── storage/           # Data persistence (repositories, settings, tags)
+├── ui/               # User interface components (settings tab, views)
+├── utils/            # Helper functions and constants
+├── types.ts          # TypeScript type definitions
+└── main.ts           # Plugin entry point
+
+tests/                # Vitest test files
+```
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## Code Quality
+
+This project uses:
+- **TypeScript** with strict mode for type safety
+- **ESLint** with Obsidian-specific rules for code quality
+- **Vitest** for unit testing
+- **esbuild** for fast, optimized builds
+
+## License
+
+MIT License - see LICENSE file for details
+
+## Acknowledgments
+
+- Built with [Obsidian API](https://docs.obsidian.md)
+- Uses GitHub GraphQL API for repository data
+- Inspired by the need to better organize and learn from starred repositories
+
+## Support
+
+If you encounter any issues or have feature requests, please:
+- Check existing [GitHub Issues](https://github.com/yourusername/obsidian-github-stargazer/issues)
+- Create a new issue with details about the problem
+- Include error logs and steps to reproduce
+
+## Roadmap
+
+- [ ] Repository browser view with filtering and search
+- [ ] Tag management UI with color picker
+- [ ] Batch operations (un-star, export, etc.)
+- [ ] Import/export functionality
+- [ ] Statistics and insights dashboard
+- [ ] Integration with other Obsidian plugins

@@ -1,5 +1,5 @@
-import { App } from 'obsidian';
-import { SyncState } from '@/types';
+import type { App } from "obsidian";
+import type { SyncState } from "@/types";
 
 /**
  * Storage layer for sync state
@@ -8,7 +8,7 @@ import { SyncState } from '@/types';
  * and last sync information.
  */
 export class SyncStateStore {
-	private readonly STATE_FILE = 'github-sync-state.json';
+	private readonly STATE_FILE = "github-sync-state.json";
 	private app: App;
 	private cache: SyncState | null = null;
 
@@ -25,7 +25,9 @@ export class SyncStateStore {
 
 			if (!data) {
 				// Return default state if file doesn't exist
-				return this.getDefaultState();
+				const defaultState = this.getDefaultState();
+				this.cache = defaultState;
+				return defaultState;
 			}
 
 			const parsed = JSON.parse(data) as SyncState;
@@ -59,9 +61,12 @@ export class SyncStateStore {
 		state.currentStep = progress.currentStep;
 		state.repositoriesProcessed = progress.repositoriesProcessed;
 		state.totalRepositories = progress.totalRepositories;
-		state.percentageComplete = Math.floor(
-			(progress.repositoriesProcessed / progress.totalRepositories) * 100
-		);
+		state.percentageComplete =
+			progress.totalRepositories > 0
+				? Math.floor(
+						(progress.repositoriesProcessed / progress.totalRepositories) * 100,
+					)
+				: 0;
 
 		await this.saveSyncState(state);
 	}
@@ -73,8 +78,10 @@ export class SyncStateStore {
 		const state = await this.loadSyncState();
 
 		state.isSyncing = true;
-		state.currentStep = 'Initializing';
-		state.startTime = new Date().toISOString();
+		state.currentStep = "Initializing";
+		const now = new Date().toISOString();
+		state.startTime = now;
+		state.lastSync = now;
 		state.error = null;
 
 		await this.saveSyncState(state);
@@ -87,15 +94,18 @@ export class SyncStateStore {
 		const state = await this.loadSyncState();
 
 		state.isSyncing = false;
-		state.lastSync = new Date().toISOString();
-		state.currentStep = 'Completed';
+		const completedAt = new Date().toISOString();
+		state.lastSync = completedAt;
+		state.currentStep = "Completed";
 		state.repositoriesProcessed = repositoryCount;
 		state.totalRepositories = repositoryCount;
 		state.percentageComplete = 100;
-		state.endTime = new Date().toISOString();
+		state.endTime = completedAt;
+		state.error = null;
 
 		if (state.startTime) {
-			const duration = new Date(state.endTime).getTime() - new Date(state.startTime).getTime();
+			const duration =
+				new Date(state.endTime).getTime() - new Date(state.startTime).getTime();
 			state.duration = Math.floor(duration / 1000); // Duration in seconds
 		}
 
@@ -110,7 +120,7 @@ export class SyncStateStore {
 
 		state.isSyncing = false;
 		state.error = error;
-		state.currentStep = 'Failed';
+		state.currentStep = "Failed";
 		state.endTime = new Date().toISOString();
 
 		await this.saveSyncState(state);
@@ -138,7 +148,7 @@ export class SyncStateStore {
 		return {
 			isSyncing: false,
 			lastSync: null,
-			currentStep: 'idle',
+			currentStep: "idle",
 			repositoriesProcessed: 0,
 			totalRepositories: 0,
 			percentageComplete: 0,

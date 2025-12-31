@@ -1,10 +1,10 @@
-import { Notice } from 'obsidian';
-import { GitHubGraphQLClient } from '@/sync/github-client';
-import { RateLimiter } from '@/sync/rate-limiter';
-import { RepositoryStore } from '@/storage/repository-store';
-import { SyncStateStore } from '@/storage/sync-state-store';
-import { Repository, RepositoryData } from '@/types';
-import { DEFAULT_PAGE_SIZE, ERROR_MESSAGES } from '@/utils/constants';
+import { Notice } from "obsidian";
+import type { RepositoryStore } from "@/storage/repository-store";
+import type { SyncStateStore } from "@/storage/sync-state-store";
+import { GitHubGraphQLClient } from "@/sync/github-client";
+import { RateLimiter } from "@/sync/rate-limiter";
+import type { Repository } from "@/types";
+import { DEFAULT_PAGE_SIZE, ERROR_MESSAGES } from "@/utils/constants";
 
 /**
  * Sync service for managing GitHub starred repositories synchronization
@@ -21,7 +21,7 @@ export class SyncService {
 	constructor(
 		githubToken: string,
 		repositoryStore: RepositoryStore,
-		syncStateStore: SyncStateStore
+		syncStateStore: SyncStateStore,
 	) {
 		this.githubClient = new GitHubGraphQLClient(githubToken);
 		this.rateLimiter = new RateLimiter();
@@ -39,7 +39,7 @@ export class SyncService {
 
 		try {
 			await this.syncStateStore.markSyncStarted();
-			new Notice('Starting GitHub starred repositories sync...');
+			new Notice("Starting GitHub starred repositories sync...");
 
 			// Fetch all pages of repositories
 			do {
@@ -47,7 +47,7 @@ export class SyncService {
 				if (this.rateLimiter.shouldThrottle()) {
 					const waitTime = this.rateLimiter.getTimeUntilReset();
 					new Notice(
-						`Rate limit approaching. Waiting ${Math.ceil(waitTime / 1000)} seconds...`
+						`Rate limit approaching. Waiting ${Math.ceil(waitTime / 1000)} seconds...`,
 					);
 					await this.sleep(waitTime);
 				}
@@ -55,7 +55,7 @@ export class SyncService {
 				// Fetch page
 				const response = await this.githubClient.fetchStarredRepositories(
 					cursor,
-					DEFAULT_PAGE_SIZE
+					DEFAULT_PAGE_SIZE,
 				);
 
 				// Update rate limit info from response headers if available
@@ -65,7 +65,7 @@ export class SyncService {
 					this.rateLimiter.trackQuery(
 						rateLimit.cost,
 						rateLimit.remaining,
-						rateLimit.resetAt ? new Date(rateLimit.resetAt) : undefined
+						rateLimit.resetAt ? new Date(rateLimit.resetAt) : undefined,
 					);
 				}
 
@@ -98,7 +98,8 @@ export class SyncService {
 			new Notice(`Successfully synced ${repositories.length} repositories!`);
 			return repositories;
 		} catch (error) {
-			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+			const errorMessage =
+				error instanceof Error ? error.message : "Unknown error";
 			await this.syncStateStore.markSyncFailed(errorMessage);
 			new Notice(`Sync failed: ${errorMessage}`);
 			throw error;
@@ -115,11 +116,13 @@ export class SyncService {
 	}> {
 		try {
 			await this.syncStateStore.markSyncStarted();
-			new Notice('Starting incremental sync...');
+			new Notice("Starting incremental sync...");
 
 			// Load existing repositories
 			const existingData = await this.repositoryStore.loadRepositories();
-			const existingRepos = new Map(existingData.repositories.map((r) => [r.id, r]));
+			const existingRepos = new Map(
+				existingData.repositories.map((r) => [r.id, r]),
+			);
 
 			// Fetch current starred repositories
 			const currentRepos = await this.performInitialSync();
@@ -128,7 +131,10 @@ export class SyncService {
 			const changes = this.detectChanges(existingRepos, currentRepos);
 
 			// Process new and updated repositories
-			await this.repositoryStore.addRepositories([...changes.added, ...changes.updated]);
+			await this.repositoryStore.addRepositories([
+				...changes.added,
+				...changes.updated,
+			]);
 
 			// Mark removed repositories as unstarred
 			for (const removedId of changes.removed) {
@@ -140,7 +146,8 @@ export class SyncService {
 
 			return changes;
 		} catch (error) {
-			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+			const errorMessage =
+				error instanceof Error ? error.message : "Unknown error";
 			await this.syncStateStore.markSyncFailed(errorMessage);
 			new Notice(`Incremental sync failed: ${errorMessage}`);
 			throw error;
@@ -152,7 +159,7 @@ export class SyncService {
 	 */
 	private detectChanges(
 		existing: Map<string, Repository>,
-		current: Repository[]
+		current: Repository[],
 	): {
 		added: Repository[];
 		updated: Repository[];
@@ -191,21 +198,30 @@ export class SyncService {
 	/**
 	 * Compare updated dates to detect repository changes
 	 */
-	private compareUpdatedDates(existing: Repository, current: Repository): boolean {
+	private compareUpdatedDates(
+		existing: Repository,
+		current: Repository,
+	): boolean {
 		return existing.updatedAt !== current.updatedAt;
 	}
 
 	/**
 	 * Detect new repositories
 	 */
-	private detectNewRepos(existing: Map<string, Repository>, current: Repository[]): Repository[] {
+	private detectNewRepos(
+		existing: Map<string, Repository>,
+		current: Repository[],
+	): Repository[] {
 		return current.filter((repo) => !existing.has(repo.id));
 	}
 
 	/**
 	 * Detect deleted repositories
 	 */
-	private detectDeletedRepos(existing: Map<string, Repository>, current: Repository[]): string[] {
+	private detectDeletedRepos(
+		existing: Map<string, Repository>,
+		current: Repository[],
+	): string[] {
 		const currentIds = new Set(current.map((r) => r.id));
 		return Array.from(existing.keys()).filter((id) => !currentIds.has(id));
 	}
@@ -213,10 +229,12 @@ export class SyncService {
 	/**
 	 * Check if repository has changed
 	 */
-	private hasRepositoryChanged(existing: Repository, current: Repository): boolean {
+	private hasRepositoryChanged(
+		existing: Repository,
+		current: Repository,
+	): boolean {
 		return (
 			existing.updatedAt !== current.updatedAt ||
-			existing.pushedAt !== current.pushedAt ||
 			existing.starCount !== current.starCount ||
 			existing.description !== current.description ||
 			existing.primaryLanguage !== current.primaryLanguage ||
@@ -238,7 +256,7 @@ export class SyncService {
 				id: node.id,
 				name: node.name,
 				nameWithOwner: node.nameWithOwner,
-				description: node.description || '',
+				description: node.description || "",
 				url: node.url,
 				starCount: node.stargazerCount,
 				primaryLanguage: node.primaryLanguage?.name || null,
@@ -264,7 +282,7 @@ export class SyncService {
 			throw new Error(ERROR_MESSAGES.RATE_LIMIT_EXCEEDED);
 		}
 
-		const delay = BASE_DELAY * Math.pow(2, retryCount);
+		const delay = BASE_DELAY * 2 ** retryCount;
 		new Notice(`Rate limited. Retrying in ${delay / 1000} seconds...`);
 		await this.sleep(delay);
 	}

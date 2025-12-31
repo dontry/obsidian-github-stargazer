@@ -63,7 +63,7 @@ function getRelativeTimeString(date: Date): string {
 	const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
 	if (diffInSeconds < 60) {
-		return diffInSeconds <= 1 ? 'just now' : `${diffInSeconds} seconds ago`;
+		return 'just now';
 	}
 
 	const diffInMinutes = Math.floor(diffInSeconds / 60);

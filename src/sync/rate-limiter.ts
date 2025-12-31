@@ -7,13 +7,21 @@ export class RateLimiter {
 	private limit: number = 5000;
 	private used: number = 0;
 	private resetAt: Date | null = null;
+	private lastReportedUsed: number | null = null;
 
 	/**
 	 * Track a query and update rate limit information
 	 */
 	trackQuery(cost: number, used: number, resetAt?: Date): void {
-		this.used = used;
+		const delta =
+			this.lastReportedUsed === null
+				? cost
+				: Math.max(0, used - this.lastReportedUsed);
+
+		this.used += delta;
 		this.remaining = Math.max(0, this.limit - used);
+		this.lastReportedUsed = used;
+
 		if (resetAt) {
 			this.resetAt = resetAt;
 		}

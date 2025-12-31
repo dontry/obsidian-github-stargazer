@@ -69,8 +69,7 @@ export const GITHUB_TOKEN_MIN_LENGTH = 40;
 /** Error message templates */
 export const ERROR_MESSAGES = {
 	AUTH_FAILED: 'Authentication failed. Please check your GitHub token in settings.',
-	RATE_LIMIT_EXCEEDED: (minutes: number) =>
-		`Rate limit exceeded. Please wait ${minutes} minutes before syncing again.`,
+	RATE_LIMIT_EXCEEDED: `Rate limit exceeded. Please wait before syncing again.`,
 	NETWORK_ERROR: 'Network error. Please check your connection and try again.',
 	NO_REPOSITORIES: 'No starred repositories found.',
 	SYNC_IN_PROGRESS: 'Sync is already in progress.',

@@ -2,6 +2,7 @@ import { Notice } from "obsidian";
 import type { RepositoryStore } from "@/storage/repository-store";
 import type { SyncStateStore } from "@/storage/sync-state-store";
 import { GitHubGraphQLClient } from "@/sync/github-client";
+import type { GetStarredRepositoriesResponse } from "@/sync/graphql-queries";
 import { RateLimiter } from "@/sync/rate-limiter";
 import type { Repository } from "@/types";
 import { DEFAULT_PAGE_SIZE, ERROR_MESSAGES } from "@/utils/constants";
@@ -70,7 +71,7 @@ export class SyncService {
 				}
 
 				// Transform and collect repositories
-				const pageRepositories = this.transformGitHubResponse(response);
+				const pageRepositories = this.transformGitHubResponse(response.data);
 				repositories.push(...pageRepositories);
 
 				// Update progress
@@ -82,7 +83,7 @@ export class SyncService {
 				});
 
 				// Get next cursor
-				const pageInfo = response.viewer.starredRepositories.pageInfo;
+				const pageInfo = response.data.viewer.starredRepositories.pageInfo;
 				cursor = pageInfo.hasNextPage ? pageInfo.endCursor : null;
 
 				// Small delay between pages to be respectful
@@ -245,18 +246,16 @@ export class SyncService {
 	/**
 	 * Transform GitHub GraphQL response to Repository format
 	 */
-	private transformGitHubResponse(response: any): Repository[] {
-		if (!response?.viewer?.starredRepositories?.edges) {
-			return [];
-		}
-
-		return response.viewer.starredRepositories.edges.map((edge: any) => {
+	private transformGitHubResponse(
+		response: GetStarredRepositoriesResponse,
+	): Repository[] {
+		return response.viewer.starredRepositories.edges.map((edge) => {
 			const node = edge.node;
 			return {
 				id: node.id,
 				name: node.name,
 				nameWithOwner: node.nameWithOwner,
-				description: node.description || "",
+				description: node.description,
 				url: node.url,
 				starCount: node.stargazerCount,
 				primaryLanguage: node.primaryLanguage?.name || null,

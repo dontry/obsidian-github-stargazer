@@ -1,4 +1,5 @@
-import { Notice } from "obsidian";
+import { Notice, type Plugin } from "obsidian";
+import type GitHubStargazerPlugin from "@/main";
 import type { RepositoryStore } from "@/storage/repository-store";
 import type { SyncStateStore } from "@/storage/sync-state-store";
 import { SyncService } from "@/sync/sync-service";
@@ -65,7 +66,10 @@ export class SyncCommand {
 	 * Handle errors during sync
 	 */
 	private handleError(error: unknown): void {
-		let message: (typeof ERROR_MESSAGES)[keyof typeof ERROR_MESSAGES] | `Sync failed: ${string}` | "Unknown Error" = "Unknown Error"
+		let message:
+			| (typeof ERROR_MESSAGES)[keyof typeof ERROR_MESSAGES]
+			| `Sync failed: ${string}`
+			| "Unknown Error" = "Unknown Error";
 
 		if (error instanceof Error) {
 			// Check for specific error types
@@ -88,7 +92,7 @@ export class SyncCommand {
 				message = `Sync failed: ${error.message}`;
 			}
 		}
-			new Notice(message);
+		new Notice(message);
 		console.error("[GitHub Stargazer] Sync error:", error);
 	}
 
@@ -108,7 +112,7 @@ export class SyncCommand {
  * Factory function to create and register the sync command
  */
 export function registerSyncCommand(
-	plugin: any,
+	plugin: GitHubStargazerPlugin,
 	repositoryStore: RepositoryStore,
 	syncStateStore: SyncStateStore,
 ): void {
@@ -116,7 +120,7 @@ export function registerSyncCommand(
 
 	plugin.addCommand({
 		id: "sync-repositories",
-		name: "Sync Starred Repositories",
+		name: "Sync starred repositories",
 		callback: async () => {
 			const settings = plugin.settings;
 			await syncCommand.execute(
@@ -131,7 +135,7 @@ export function registerSyncCommand(
 	// Also register a force initial sync command
 	plugin.addCommand({
 		id: "sync-repositories-force",
-		name: "Sync Starred Repositories (Force Full Sync)",
+		name: "Sync starred repositories (force full sync)",
 		callback: async () => {
 			const settings = plugin.settings;
 			await syncCommand.execute(

@@ -40,7 +40,7 @@ export default class GitHubStargazerPlugin extends Plugin {
 		this.addSettingTab(new GitHubStargazerSettingTab(this.app, this));
 
 		// Add ribbon icon
-		// eslint-disable-next-line obsidianmd/ui/sentence-case
+		 
 		this.addRibbonIcon("star", "GitHub Stargazer", (evt: MouseEvent) => {
 			this.syncRepositories().catch(err => console.error(err));
 		});
@@ -107,7 +107,7 @@ export default class GitHubStargazerPlugin extends Plugin {
 	) {
 		if (!this.settings.githubToken || this.settings.githubToken.trim() === "") {
 			new Notice(
-				// eslint-disable-next-line obsidianmd/ui/sentence-case
+				 
 				"Please configure your GitHub token in settings first. Open Settings Community plugins → GitHub Stargazer.",
 			);
 			return;

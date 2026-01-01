@@ -1,4 +1,10 @@
-import { GITHUB_GRAPHQL_API_URL } from '@/utils/constants';
+import { requestUrl } from "obsidian";
+import type {
+	GetStarredRepositoriesResponse,
+	GitHubGraphQLResult,
+	UnstarRepositoryResponse,
+} from "@/sync/graphql-queries";
+import { GITHUB_GRAPHQL_API_URL } from "@/utils/constants";
 
 /**
  * GitHub GraphQL API client
@@ -14,7 +20,10 @@ export class GitHubGraphQLClient {
 	/**
 	 * Fetch starred repositories from GitHub
 	 */
-	async fetchStarredRepositories(cursor: string | null, pageSize: number): Promise<any> {
+	async fetchStarredRepositories(
+		cursor: string | null,
+		pageSize: number,
+	): Promise<GitHubGraphQLResult<GetStarredRepositoriesResponse>> {
 		const query = `
 			query GetStarredRepositories($cursor: String, $pageSize: Int!) {
 				viewer {
@@ -63,11 +72,12 @@ export class GitHubGraphQLClient {
 			}
 		`;
 
-		const response = await fetch(GITHUB_GRAPHQL_API_URL, {
-			method: 'POST',
+		const response = await requestUrl({
+			url: GITHUB_GRAPHQL_API_URL,
+			method: "POST",
 			headers: {
 				Authorization: `Bearer ${this.token}`,
-				'Content-Type': 'application/json',
+				"Content-Type": "application/json",
 			},
 			body: JSON.stringify({
 				query,
@@ -75,23 +85,29 @@ export class GitHubGraphQLClient {
 			}),
 		});
 
-		if (!response.ok) {
+		if (response.status !== 200 && response.status !== 201) {
 			if (response.status === 401) {
-				throw new Error('Authentication failed. Please check your GitHub token.');
+				throw new Error(
+					"Authentication failed. Please check your GitHub token.",
+				);
 			}
 			if (response.status === 403) {
-				throw new Error('Rate limit exceeded. Please wait before syncing again.');
+				throw new Error(
+					"Rate limit exceeded. Please wait before syncing again.",
+				);
 			}
-			throw new Error(`GitHub API request failed: ${response.statusText}`);
+			throw new Error(`GitHub API request failed: ${response.status} ${response.text}`);
 		}
 
-		const data = await response.json();
+		const data =
+			// eslint-disable-next-line @typescript-eslint/no-unsafe-call
+			(await response.json()) as GitHubGraphQLResult<GetStarredRepositoriesResponse>;
 
-		if (data.errors) {
+		if (data.errors?.length) {
 			throw new Error(`GraphQL errors: ${JSON.stringify(data.errors)}`);
 		}
 
-		return data.data;
+		return data;
 	}
 
 	/**
@@ -106,11 +122,12 @@ export class GitHubGraphQLClient {
 			}
 		`;
 
-		const response = await fetch(GITHUB_GRAPHQL_API_URL, {
-			method: 'POST',
+		const response = await requestUrl({
+			url: GITHUB_GRAPHQL_API_URL,
+			method: "POST",
 			headers: {
 				Authorization: `Bearer ${this.token}`,
-				'Content-Type': 'application/json',
+				"Content-Type": "application/json",
 			},
 			body: JSON.stringify({
 				query: mutation,
@@ -118,14 +135,18 @@ export class GitHubGraphQLClient {
 			}),
 		});
 
-		if (!response.ok) {
-			throw new Error(`Failed to unstar repository: ${response.statusText}`);
+		if (response.status !== 200) {
+			throw new Error(`Failed to unstar repository: ${response.status}`);
 		}
 
-		const data = await response.json();
+		if (typeof response.json === 'function') {
+			const data =
+				// eslint-disable-next-line @typescript-eslint/no-unsafe-call
+				(await response.json()) as GitHubGraphQLResult<UnstarRepositoryResponse>;
 
-		if (data.errors) {
-			throw new Error(`GraphQL errors: ${JSON.stringify(data.errors)}`);
+			if (data.errors?.length) {
+				throw new Error(`GraphQL errors: ${JSON.stringify(data.errors)}`);
+			}
 		}
 	}
 }

@@ -127,3 +127,95 @@ export interface UnstarRepositoryVariables {
 export interface GetRepositoryByIdVariables {
 	repositoryId: string;
 }
+
+/**
+ * Query response types
+ */
+export interface GetStarredRepositoriesResponse {
+	viewer: {
+		starredRepositories: {
+			pageInfo: {
+				hasNextPage: boolean;
+				endCursor: string | null;
+			};
+			edges: Array<{
+				node: {
+					id: string;
+					name: string;
+					nameWithOwner: string;
+					description: string | null;
+					url: string;
+					stargazerCount: number;
+					primaryLanguage: {
+						name: string;
+					} | null;
+					createdAt: string;
+					updatedAt: string;
+					pushedAt: string;
+					owner: {
+						login: string;
+						url: string;
+					};
+					readme: {
+						text: string;
+					} | null;
+					defaultBranchRef: {
+						name: string;
+					} | null;
+				};
+				starredAt: string;
+			}>;
+		};
+	};
+}
+
+export interface GetRepositoryByIdResponse {
+	node: {
+		id: string;
+		name: string;
+		nameWithOwner: string;
+		description: string | null;
+		url: string;
+		stargazerCount: number;
+		primaryLanguage: {
+			name: string;
+		} | null;
+		createdAt: string;
+		updatedAt: string;
+		pushedAt: string;
+		owner: {
+			login: string;
+			url: string;
+		};
+		readme: {
+			text: string;
+		} | null;
+		defaultBranchRef: {
+			name: string;
+		} | null;
+	} | null;
+}
+
+export interface GitHubGraphQLRateLimit {
+	cost: number;
+	remaining: number;
+	resetAt: string;
+}
+
+export interface GitHubGraphQLExtensions {
+	rateLimit?: GitHubGraphQLRateLimit;
+}
+
+export interface GitHubGraphQLResult<T> {
+	data: T;
+	extensions?: GitHubGraphQLExtensions;
+	errors?: Array<{
+		message: string;
+	}>;
+}
+
+export interface UnstarRepositoryResponse {
+	removeStar: {
+		clientMutationId: string | null;
+	} | null;
+}

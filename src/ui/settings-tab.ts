@@ -20,7 +20,7 @@ export class GitHubStargazerSettingTab extends PluginSettingTab {
 		containerEl.empty();
 
 		// Header
-		containerEl.createEl("h2", { text: "GitHub Stargazer Settings" });
+		;
 
 		// Description
 		containerEl.createEl("p", {
@@ -101,7 +101,7 @@ export class GitHubStargazerSettingTab extends PluginSettingTab {
 			);
 
 		// Sync Status Section
-		containerEl.createEl("h3", { text: "Sync Status" });
+		new Setting(containerEl).setName("Sync Status").setHeading();
 
 		const syncInfo = containerEl.createDiv();
 		syncInfo.createEl("p", { text: "Last sync: Checking..." });
@@ -132,7 +132,7 @@ export class GitHubStargazerSettingTab extends PluginSettingTab {
 			);
 
 		// Help Section
-		containerEl.createEl("h3", { text: "Help & Resources" });
+		new Setting(containerEl).setName("Help & Resources").setHeading();
 
 		const helpDiv = containerEl.createDiv();
 		helpDiv.createEl("p", {

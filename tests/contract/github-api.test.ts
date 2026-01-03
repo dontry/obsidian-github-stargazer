@@ -64,7 +64,7 @@ describe("GitHub GraphQL API Contract", () => {
 			);
 
 			// Verify repository node structure
-			const repo = mockResponse.viewer.starredRepositories.edges[0].node;
+			const repo = mockResponse.viewer.starredRepositories.edges?.[0]?.node;
 			expect(repo).toHaveProperty("id");
 			expect(repo).toHaveProperty("name");
 			expect(repo).toHaveProperty("nameWithOwner");

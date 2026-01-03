@@ -1,11 +1,17 @@
 import { Notice } from "obsidian";
+import type { App } from "obsidian";
 import type { RepositoryStore } from "@/storage/repository-store";
 import type { SyncStateStore } from "@/storage/sync-state-store";
 import { GitHubGraphQLClient } from "@/sync/github-client";
-import type { GetStarredRepositoriesResponse } from "@/sync/graphql-queries";
 import { RateLimiter } from "@/sync/rate-limiter";
-import type { Repository } from "@/types";
-import { DEFAULT_PAGE_SIZE, ERROR_MESSAGES } from "@/utils/constants";
+import { SyncChangeDetector } from "@/sync/sync-change-detector";
+import { SyncCheckpointHandler } from "@/sync/sync-checkpoint-handler";
+import { SyncResumeHandler } from "@/sync/sync-resume";
+import { SyncPageFetcher } from "@/sync/sync-page-fetcher";
+import type { Repository, SyncCheckpoint } from "@/types";
+import { checkDiskSpace } from "@/utils/disk-check";
+import { ERROR_MESSAGES } from "@/utils/constants";
+import { info, error } from "@/utils/logger";
 
 /**
  * Sync service for managing GitHub starred repositories synchronization
@@ -18,92 +24,121 @@ export class SyncService {
 	private rateLimiter: RateLimiter;
 	private repositoryStore: RepositoryStore;
 	private syncStateStore: SyncStateStore;
+	private checkpointHandler: SyncCheckpointHandler;
+	private resumeHandler: SyncResumeHandler;
+	private pageFetcher: SyncPageFetcher;
+	private changeDetector: SyncChangeDetector;
+	private app: App;
 
 	constructor(
+		app: App,
 		githubToken: string,
 		repositoryStore: RepositoryStore,
 		syncStateStore: SyncStateStore,
 	) {
+		this.app = app;
 		this.githubClient = new GitHubGraphQLClient(githubToken);
 		this.rateLimiter = new RateLimiter();
 		this.repositoryStore = repositoryStore;
 		this.syncStateStore = syncStateStore;
+		this.checkpointHandler = new SyncCheckpointHandler(
+			app,
+			repositoryStore,
+		);
+		this.pageFetcher = new SyncPageFetcher(
+			this.githubClient,
+			this.rateLimiter,
+			syncStateStore,
+		);
+		this.changeDetector = new SyncChangeDetector();
+		this.resumeHandler = new SyncResumeHandler(
+			app,
+			this.githubClient,
+			this.rateLimiter,
+			this.checkpointHandler,
+			syncStateStore,
+		);
 	}
 
 	/**
 	 * Perform initial sync - fetch all starred repositories
+	 * Enhanced with checkpoint support (T023, T026, T027, T028, T029, T030)
 	 */
 	async performInitialSync(): Promise<Repository[]> {
-		const repositories: Repository[] = [];
-		let cursor: string | null = null;
-		let pageCount = 0;
+		let currentCheckpoint: SyncCheckpoint | null = null;
 
 		try {
+			// Check disk space before sync
+			const hasDiskSpace = await checkDiskSpace(this.app);
+			if (!hasDiskSpace) {
+				throw new Error(ERROR_MESSAGES.INSUFFICIENT_DISK_SPACE);
+			}
+
 			await this.syncStateStore.markSyncStarted();
+			info("Sync started"); // Lifecycle logging
+
 			new Notice("Starting GitHub starred repositories sync...");
 
+			// Fetch total count at start
+			const totalCount = await this.githubClient.fetchTotalCount();
+			info("Fetched total starred repositories count", {
+				totalCount,
+			});
+
+			// Create initial checkpoint
+			currentCheckpoint = {
+				cursor: null,
+				repositories: [],
+				totalCount,
+				fetchedCount: 0,
+				timestamp: new Date().toISOString(),
+				status: "in_progress",
+				sessionId: crypto.randomUUID(),
+			};
+			await this.checkpointHandler.syncCheckpoint(currentCheckpoint);
+
 			// Fetch all pages of repositories
-			do {
-				// Check rate limit before making request
-				if (this.rateLimiter.shouldThrottle()) {
-					const waitTime = this.rateLimiter.getTimeUntilReset();
-					new Notice(
-						`Rate limit approaching. Waiting ${Math.ceil(waitTime / 1000)} seconds...`,
+			const repositories = await this.pageFetcher.fetchAllPages(
+				null,
+				totalCount,
+				async (pageRepos, cursor) => {
+					// Convert repositories to final storage incrementally
+					await this.checkpointHandler.convertIncremental(pageRepos);
+
+					// Update checkpoint after each page
+					return await this.checkpointHandler.updateCheckpoint(
+						currentCheckpoint!,
+						pageRepos,
+						cursor,
 					);
-					await this.sleep(waitTime);
-				}
+				},
+				false, // Not resuming
+			);
 
-				// Fetch page
-				const response = await this.githubClient.fetchStarredRepositories(
-					cursor,
-					DEFAULT_PAGE_SIZE,
-				);
-
-				// Update rate limit info from response headers if available
-				// (Note: GraphQL rate limit info comes from response extensions)
-				if (response.extensions?.rateLimit) {
-					const rateLimit = response.extensions.rateLimit;
-					this.rateLimiter.trackQuery(
-						rateLimit.cost,
-						rateLimit.remaining,
-						rateLimit.resetAt ? new Date(rateLimit.resetAt) : undefined,
-					);
-				}
-
-				// Transform and collect repositories
-				const pageRepositories = this.transformGitHubResponse(response.data);
-				repositories.push(...pageRepositories);
-
-				// Update progress
-				pageCount++;
-				await this.syncStateStore.updateProgress({
-					currentStep: `Fetched page ${pageCount}`,
-					repositoriesProcessed: repositories.length,
-					totalRepositories: repositories.length, // Will update when we know total
-				});
-
-				// Get next cursor
-				const pageInfo = response.data.viewer.starredRepositories.pageInfo;
-				cursor = pageInfo.hasNextPage ? pageInfo.endCursor : null;
-
-				// Small delay between pages to be respectful
-				await this.sleep(100);
-			} while (cursor);
-
-			// Save repositories
-			await this.repositoryStore.addRepositories(repositories);
+			// Delete checkpoint on sync completion
+			await this.checkpointHandler.deleteCheckpoint();
+			info("Checkpoint deleted - sync complete");
 
 			// Mark sync as completed
 			await this.syncStateStore.markSyncCompleted(repositories.length);
+			info("Sync completed", {
+				totalRepositories: repositories.length,
+			});
 
 			new Notice(`Successfully synced ${repositories.length} repositories!`);
 			return repositories;
-		} catch (error) {
+		} catch (err) {
+			// Error logging without sensitive data
 			const errorMessage =
-				error instanceof Error ? error.message : "Unknown error";
+				err instanceof Error ? err.message : "Unknown error";
+			error("Sync failed", {
+				error: errorMessage,
+				fetchedCount: currentCheckpoint?.fetchedCount || 0,
+			}); // No tokens, no full payloads
+
 			await this.syncStateStore.markSyncFailed(errorMessage);
 			new Notice(`Sync failed: ${errorMessage}`);
-			throw error;
+			throw err;
 		}
 	}
 
@@ -129,7 +164,10 @@ export class SyncService {
 			const currentRepos = await this.performInitialSync();
 
 			// Detect changes
-			const changes = this.detectChanges(existingRepos, currentRepos);
+			const changes = this.changeDetector.detectChanges(
+				existingRepos,
+				currentRepos,
+			);
 
 			// Process new and updated repositories
 			await this.repositoryStore.addRepositories([
@@ -146,150 +184,59 @@ export class SyncService {
 			new Notice(message);
 
 			return changes;
-		} catch (error) {
+		} catch (err) {
 			const errorMessage =
-				error instanceof Error ? error.message : "Unknown error";
+				err instanceof Error ? err.message : "Unknown error";
 			await this.syncStateStore.markSyncFailed(errorMessage);
 			new Notice(`Incremental sync failed: ${errorMessage}`);
-			throw error;
+			throw err;
 		}
 	}
 
 	/**
-	 * Detect changes between existing and current repositories
+	 * Sync with resume capability
+	 * Checks for existing checkpoint and offers resume option
 	 */
-	private detectChanges(
-		existing: Map<string, Repository>,
-		current: Repository[],
-	): {
-		added: Repository[];
-		updated: Repository[];
-		removed: string[];
-	} {
-		const added: Repository[] = [];
-		const updated: Repository[] = [];
-		const currentIds = new Set<string>();
-		const existingIds = new Set(existing.keys());
+	async syncWithResume(): Promise<Repository[]> {
+		// Load existing checkpoint
+		const checkpoint =
+			await this.checkpointHandler.loadCheckpointIfExists();
 
-		for (const repo of current) {
-			currentIds.add(repo.id);
+		if (checkpoint) {
+			// Show confirmation modal
+			const { resume } =
+				await this.resumeHandler.showResumeConfirmation(checkpoint);
 
-			const existingRepo = existing.get(repo.id);
-
-			if (!existingRepo) {
-				// New repository
-				added.push(repo);
-			} else if (this.hasRepositoryChanged(existingRepo, repo)) {
-				// Updated repository
-				updated.push(repo);
+			if (resume) {
+				// Resume from checkpoint
+				return await this.resumeHandler.performResumeSync(
+					checkpoint,
+				);
+			} else {
+				// User chose fresh sync
+				return await this.syncFresh();
 			}
 		}
 
-		// Find removed repositories
-		const removed: string[] = [];
-		for (const id of existingIds) {
-			if (!currentIds.has(id)) {
-				removed.push(id);
-			}
+		// No checkpoint, perform normal sync
+		return await this.performInitialSync();
+	}
+
+	/**
+	 * Start fresh sync, ignoring checkpoint
+	 * Deletes checkpoint and starts new sync
+	 */
+	private async syncFresh(): Promise<Repository[]> {
+		try {
+			// Delete existing checkpoint
+			await this.checkpointHandler.deleteCheckpoint();
+			info("Checkpoint deleted - starting fresh sync");
+
+			// Perform fresh initial sync
+			return await this.performInitialSync();
+		} catch (err) {
+			error("Failed to start fresh sync", err);
+			throw err;
 		}
-
-		return { added, updated, removed };
-	}
-
-	/**
-	 * Compare updated dates to detect repository changes
-	 */
-	private compareUpdatedDates(
-		existing: Repository,
-		current: Repository,
-	): boolean {
-		return existing.updatedAt !== current.updatedAt;
-	}
-
-	/**
-	 * Detect new repositories
-	 */
-	private detectNewRepos(
-		existing: Map<string, Repository>,
-		current: Repository[],
-	): Repository[] {
-		return current.filter((repo) => !existing.has(repo.id));
-	}
-
-	/**
-	 * Detect deleted repositories
-	 */
-	private detectDeletedRepos(
-		existing: Map<string, Repository>,
-		current: Repository[],
-	): string[] {
-		const currentIds = new Set(current.map((r) => r.id));
-		return Array.from(existing.keys()).filter((id) => !currentIds.has(id));
-	}
-
-	/**
-	 * Check if repository has changed
-	 */
-	private hasRepositoryChanged(
-		existing: Repository,
-		current: Repository,
-	): boolean {
-		return (
-			existing.updatedAt !== current.updatedAt ||
-			existing.starCount !== current.starCount ||
-			existing.description !== current.description ||
-			existing.primaryLanguage !== current.primaryLanguage ||
-			existing.readme !== current.readme
-		);
-	}
-
-	/**
-	 * Transform GitHub GraphQL response to Repository format
-	 */
-	private transformGitHubResponse(
-		response: GetStarredRepositoriesResponse,
-	): Repository[] {
-		return response.viewer.starredRepositories.edges.map((edge) => {
-			const node = edge.node;
-			return {
-				id: node.id,
-				name: node.name,
-				nameWithOwner: node.nameWithOwner,
-				description: node.description,
-				url: node.url,
-				starCount: node.stargazerCount,
-				primaryLanguage: node.primaryLanguage?.name || null,
-				owner: node.owner.login,
-				createdAt: node.createdAt,
-				updatedAt: node.updatedAt,
-				starredAt: edge.starredAt,
-				readme: node.readme?.text || null,
-				tags: [],
-				linkedResources: [],
-			};
-		});
-	}
-
-	/**
-	 * Handle rate limiting with exponential backoff
-	 */
-	private async handleRateLimit(retryCount: number = 0): Promise<void> {
-		const MAX_RETRIES = 5;
-		const BASE_DELAY = 1000; // 1 second
-
-		if (retryCount >= MAX_RETRIES) {
-			throw new Error(ERROR_MESSAGES.RATE_LIMIT_EXCEEDED);
-		}
-
-		const delay = BASE_DELAY * 2 ** retryCount;
-		new Notice(`Rate limited. Retrying in ${delay / 1000} seconds...`);
-		await this.sleep(delay);
-	}
-
-	/**
-	 * Sleep for a specified duration
-	 */
-	private sleep(ms: number): Promise<void> {
-		return new Promise((resolve) => setTimeout(resolve, ms));
 	}
 }

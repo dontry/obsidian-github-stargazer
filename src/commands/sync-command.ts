@@ -1,7 +1,8 @@
-import { Notice, type Plugin } from "obsidian";
+import { type App, Notice } from "obsidian";
 import type GitHubStargazerPlugin from "@/main";
 import type { RepositoryStore } from "@/storage/repository-store";
 import type { SyncStateStore } from "@/storage/sync-state-store";
+import { CheckpointManager } from "@/sync/checkpoint-manager";
 import { SyncService } from "@/sync/sync-service";
 import { ERROR_MESSAGES } from "@/utils/constants";
 
@@ -18,6 +19,7 @@ export class SyncCommand {
 	 * Execute the sync command
 	 */
 	async execute(
+		app: App,
 		githubToken: string,
 		repositoryStore: RepositoryStore,
 		syncStateStore: SyncStateStore,
@@ -30,8 +32,9 @@ export class SyncCommand {
 		}
 
 		try {
-			// Initialize sync service
+			// Initialize sync service with app instance
 			this.syncService = new SyncService(
+				app,
 				githubToken,
 				repositoryStore,
 				syncStateStore,
@@ -97,6 +100,58 @@ export class SyncCommand {
 	}
 
 	/**
+	 * Execute force full sync - delete checkpoint and start fresh
+	 * T065: Force sync command handler that skips confirmation
+	 */
+	async executeForceSync(
+		app: App,
+		githubToken: string,
+		repositoryStore: RepositoryStore,
+		syncStateStore: SyncStateStore,
+	): Promise<void> {
+		// Validate GitHub token
+		if (!githubToken || githubToken.trim() === "") {
+			new Notice(ERROR_MESSAGES.INVALID_TOKEN);
+			return;
+		}
+
+		try {
+			// T065: Delete checkpoint before syncing
+			const checkpointManager = new CheckpointManager(app);
+			const checkpoint = await checkpointManager.loadCheckpoint();
+
+			if (checkpoint) {
+				await checkpointManager.deleteCheckpoint();
+				new Notice("✓ Checkpoint deleted. Starting fresh sync...");
+			} else {
+				new Notice("No checkpoint found. Starting fresh sync...");
+			}
+
+			// Initialize sync service with app instance
+			this.syncService = new SyncService(
+				app,
+				githubToken,
+				repositoryStore,
+				syncStateStore,
+			);
+
+			// Show progress indicator only in environments with window
+			if (typeof window !== "undefined") {
+				const { showSyncProgress } = await import("@/ui/sync-progress");
+				showSyncProgress(syncStateStore, false);
+			}
+
+			// Perform initial sync (fresh start)
+			new Notice("Starting force full sync...");
+			await this.syncService.performInitialSync();
+
+			new Notice("Force sync completed successfully!");
+		} catch (error) {
+			this.handleError(error);
+		}
+	}
+
+	/**
 	 * Cancel ongoing sync
 	 */
 	cancel(): void {
@@ -124,6 +179,7 @@ export function registerSyncCommand(
 		callback: async () => {
 			const settings = plugin.settings;
 			await syncCommand.execute(
+				plugin.app,
 				settings.githubToken,
 				repositoryStore,
 				syncStateStore,
@@ -139,6 +195,7 @@ export function registerSyncCommand(
 		callback: async () => {
 			const settings = plugin.settings;
 			await syncCommand.execute(
+				plugin.app,
 				settings.githubToken,
 				repositoryStore,
 				syncStateStore,

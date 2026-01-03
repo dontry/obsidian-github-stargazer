@@ -5,6 +5,12 @@ An Obsidian plugin that syncs and manages your GitHub starred repositories direc
 ## Features
 
 - **Sync Starred Repositories** - Automatically fetch all repositories you've starred on GitHub using the GraphQL API
+- **Sync Progress Tracking & Resume** - Never lose progress! Sync is automatically saved with checkpoint support:
+  - Resume interrupted syncs from where you left off
+  - Real-time progress display shows repositories fetched
+  - Automatic retry with exponential backoff for network errors
+  - Checkpoint persists across Obsidian restarts
+  - Force full sync option to start fresh
 - **Repository Information** - Store comprehensive metadata including:
   - Repository name, description, and URL
   - Star count and primary programming language
@@ -66,10 +72,39 @@ cp styles.css .obsidian/plugins/github-stargazer/  # if present
 
 ### Commands
 
-- **Sync Starred Repositories** - Incrementally sync new or updated repositories
-- **Sync Starred Repositories (Force Full Sync)** - Re-sync all repositories from scratch
+- **Sync Starred Repositories** - Start or resume syncing repositories
+  - If a previous sync was interrupted, you'll be prompted to resume or start fresh
+  - Shows real-time progress with fetched/converted repository counts
+- **Sync Starred Repositories (Force Full Sync)** - Ignore any checkpoint and start a fresh sync from scratch
 - **Open Repository View** - View and browse your synced repositories (coming soon)
 - **Batch Un-star** - Manage and batch un-star repositories (coming soon)
+
+### Sync Progress & Resume
+
+The plugin automatically saves your sync progress, so you never lose work:
+
+**What Gets Saved**:
+- Sync position (which page you're on)
+- Repositories fetched so far
+- Total repository count
+- Timestamp and session ID
+
+**When Sync is Interrupted**:
+1. Next sync attempt shows a confirmation modal
+2. Choose to resume from checkpoint or start fresh
+3. Resume skips already-fetched repositories (saves time and API quota)
+4. Progress is shown in real-time with fetched/converted counts
+
+**Checkpoint Management**:
+- Checkpoints are automatically deleted after successful sync
+- View checkpoint info in Settings → GitHub Stargazer
+- Manually reset checkpoint from settings if needed
+- Checkpoint file location: `.obsidian/plugins/obsidian-github-stargazer/.sync-checkpoint.json`
+
+**Error Recovery**:
+- Network errors trigger automatic retry (3 attempts with exponential backoff)
+- Checkpoint is preserved even if sync fails
+- Corrupted checkpoint files are automatically preserved for debugging
 
 ### Managing Repositories
 
@@ -117,14 +152,43 @@ pnpm run lint
 
 ```
 src/
-├── commands/          # Command implementations (sync, etc.)
-├── storage/           # Data persistence (repositories, settings, tags)
-├── ui/               # User interface components (settings tab, views)
-├── utils/            # Helper functions and constants
-├── types.ts          # TypeScript type definitions
-└── main.ts           # Plugin entry point
+├── commands/          # Command implementations (sync, force sync, etc.)
+├── storage/           # Data persistence (repositories, settings, sync state)
+│   ├── repository-store.ts       # Repository CRUD operations
+│   ├── settings-store.ts          # Plugin settings management
+│   └── sync-state-store.ts        # Sync progress state tracking
+├── sync/              # Sync orchestration and checkpoint management
+│   ├── github-client.ts           # GitHub GraphQL API client with retry logic
+│   ├── sync-service.ts            # Main sync orchestration
+│   ├── checkpoint-manager.ts      # Checkpoint file I/O
+│   ├── checkpoint-validator.ts    # Checkpoint validation
+│   ├── sync-resume.ts             # Resume workflow
+│   ├── sync-page-fetcher.ts       # Pagination logic
+│   ├── sync-checkpoint-handler.ts # Checkpoint operations
+│   └── sync-change-detector.ts    # Incremental sync change detection
+├── ui/                # User interface components
+│   ├── settings-tab.ts            # Plugin settings UI
+│   ├── sync-progress.ts           # Progress display modal
+│   └── checkpoint-modal.ts        # Resume confirmation modal
+├── utils/             # Helper functions and constants
+│   ├── logger.ts                 # Logging utilities (sanitizes errors)
+│   ├── disk-check.ts             # Disk space verification
+│   ├── date-utils.ts             # Date formatting utilities
+│   └── constants.ts              # App constants
+├── types.ts           # TypeScript type definitions
+└── main.ts            # Plugin entry point
 
-tests/                # Vitest test files
+tests/                  # Vitest test files
+├── unit/              # Unit tests for individual components
+├── integration/       # Integration tests for workflows
+└── mocks/             # Mock implementations for testing
+
+docs/                   # Documentation
+├── constitution-compliance.md     # Code quality compliance report
+├── performance-verification.md    # Performance analysis
+├── quickstart-test-coverage.md    # Test coverage report
+├── sensitive-data-verification.md # Security audit
+└── checkpoint-location-verification.md # File location verification
 ```
 
 ## Contributing

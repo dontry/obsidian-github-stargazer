@@ -34,7 +34,7 @@ export class RepositoryStore {
 			const parsed = JSON.parse(data) as RepositoryData;
 			this.cache = parsed.repositories;
 			return parsed;
-		} catch (error) {
+		} catch {
 			// File doesn't exist or is invalid
 			return {
 				lastSync: null,

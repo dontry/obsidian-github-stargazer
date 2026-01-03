@@ -121,6 +121,13 @@ export interface SyncState {
 	endTime: string | null;
 	/** Duration of the last sync in seconds */
 	duration: number | null;
+	// T060: Checkpoint info for resume status display
+	/** true if resuming from checkpoint, false if starting fresh */
+	isResuming?: boolean;
+	/** Number of repositories fetched from GitHub */
+	fetchedCount?: number;
+	/** Number of repositories converted to final storage */
+	convertedCount?: number;
 }
 
 /**
@@ -167,4 +174,87 @@ export interface RepositoryData {
 export interface TagData {
 	/** Array of tag objects */
 	tags: Tag[];
+}
+
+/**
+ * Sync checkpoint for tracking progress during repository synchronization
+ */
+export interface SyncCheckpoint {
+	/** GraphQL pagination cursor for the last fetched page (null for first page) */
+	cursor: string | null;
+	/** Complete metadata for all repositories fetched so far */
+	repositories: Repository[];
+	/** Total count of starred repositories (fetched at sync start) */
+	totalCount: number;
+	/** Number of repositories successfully fetched so far */
+	fetchedCount: number;
+	/** ISO 8601 timestamp of last checkpoint update (optional) */
+	timestamp?: string;
+	/** Current state of the sync operation (optional) */
+	status?: SyncStatus;
+	/** UUID uniquely identifying this sync attempt (optional) */
+	sessionId?: string;
+}
+
+/**
+ * Current state of a synchronization operation
+ */
+export type SyncStatus = 'in_progress' | 'completed' | 'failed';
+
+/**
+ * Real-time progress metrics for sync operations
+ */
+export interface SyncProgress {
+	/** Total number of starred repositories to fetch */
+	totalCount: number;
+	/** Number of repositories fetched so far */
+	fetchedCount: number;
+	/** Number of repositories converted to final repository storage */
+	convertedCount: number;
+	/** true if resuming from existing checkpoint, false if starting fresh */
+	isResuming: boolean;
+	/** Current phase of sync operation */
+	currentPhase: SyncPhase;
+}
+
+/**
+ * Enumeration of sync phases for detailed progress display
+ */
+export type SyncPhase =
+	| 'fetching_total_count' // Querying GitHub for total starred repos
+	| 'loading_checkpoint' // Reading existing checkpoint file
+	| 'fetching_repositories' // Fetching pages from GitHub API
+	| 'converting_to_storage' // Converting checkpoint to final storage
+	| 'completed'; // Sync finished successfully
+
+/**
+ * Validation error types for checkpoint operations
+ */
+export type ValidationReason =
+	| 'file_not_found' // No checkpoint exists (not an error)
+	| 'json_parse_error' // Corrupted JSON (unrecoverable)
+	| 'missing_required_field' // Missing cursor/repositories (unrecoverable)
+	| 'invalid_format' // Invalid field type/format (unrecoverable)
+	| 'missing_optional_field' // Missing timestamp/status (recoverable, warn user)
+	| 'stale_checkpoint' // Checkpoint > 7 days old (recoverable, warn user)
+	| 'inconsistent_data' // fetchedCount != repositories.length (warn user)
+	| 'concurrent_sync'; // Another sync already in progress (blocking)
+
+/**
+ * Error thrown when checkpoint validation fails
+ */
+export class CheckpointValidationError extends Error {
+	/**
+	 * @param message - Human-readable error message
+	 * @param reason - Specific validation reason that occurred
+	 * @param isRecoverable - Whether the error is recoverable (user can choose to continue)
+	 */
+	constructor(
+		message: string,
+		public readonly reason: ValidationReason,
+		public readonly isRecoverable: boolean
+	) {
+		super(message);
+		this.name = 'CheckpointValidationError';
+	}
 }

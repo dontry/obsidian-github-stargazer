@@ -42,9 +42,6 @@ export const SEARCH_DEBOUNCE_DELAY_MS = 300;
 /** Minimum tap target size for mobile in pixels */
 export const MIN_MOBILE_TAP_TARGET_PX = 44;
 
-/** Local storage directory name */
-export const PLUGIN_DATA_DIR = '.obsidian/plugins/github-stargazer/data';
-
 /** Repositories data file name */
 export const REPOSITORIES_DATA_FILE = 'repositories.json';
 
@@ -75,6 +72,7 @@ export const ERROR_MESSAGES = {
 	SYNC_IN_PROGRESS: 'Sync is already in progress.',
 	INVALID_TOKEN: 'Invalid GitHub token format. Token must start with "ghp_" and be at least 40 characters.',
 	INVALID_URL: 'Invalid URL. Please enter a valid HTTP or HTTPS URL.',
+	INSUFFICIENT_DISK_SPACE: 'Insufficient disk space. Please free up at least 10MB and try again.',
 } as const;
 
 /** Success message templates */

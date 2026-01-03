@@ -19,7 +19,7 @@ describe("Plugin Lifecycle", () => {
 
 	beforeEach(() => {
 		mockPlugin = createMockPlugin();
-		plugin = new GitHubStargazerPlugin(mockPlugin, {} as any);
+		plugin = new GitHubStargazerPlugin(mockPlugin.app, {} as any);
 	});
 
 	describe("onload", () => {

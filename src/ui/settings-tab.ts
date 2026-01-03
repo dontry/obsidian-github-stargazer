@@ -1,5 +1,6 @@
-import { type App, PluginSettingTab, Setting } from "obsidian";
+import { type App, PluginSettingTab, Setting, Notice } from "obsidian";
 import type GitHubStargazerPlugin from "@/main";
+import { CheckpointManager } from "@/sync/checkpoint-manager";
 
 /**
  * Settings tab for GitHub Stargazer plugin
@@ -131,6 +132,74 @@ export class GitHubStargazerSettingTab extends PluginSettingTab {
 				}),
 			);
 
+		// T062: Checkpoint Management Section
+		new Setting(containerEl).setName("Checkpoint Management").setHeading();
+
+		const checkpointInfo = containerEl.createDiv();
+		checkpointInfo.createEl("p", { text: "Loading checkpoint info..." });
+
+		// Function to load and display checkpoint info
+		const loadCheckpointInfo = async () => {
+			try {
+				const checkpointManager = new CheckpointManager(this.app);
+				const checkpoint = await checkpointManager.loadCheckpoint();
+
+				checkpointInfo.empty();
+
+				if (!checkpoint) {
+					checkpointInfo.createEl("p", {
+						text: "No checkpoint found. Sync is running normally.",
+						cls: "checkpoint-empty",
+					});
+					return;
+				}
+
+				// T062: Display checkpoint metadata
+				const age = this.formatCheckpointAge(checkpoint.timestamp);
+				const progress = `${checkpoint.fetchedCount}/${checkpoint.totalCount} (${Math.floor((checkpoint.fetchedCount / checkpoint.totalCount) * 100)}%)`;
+
+				checkpointInfo.createEl("p", {
+					text: `Checkpoint created: ${age}`,
+				});
+				checkpointInfo.createEl("p", {
+					text: `Progress: ${progress}`,
+				});
+
+				if (checkpoint.status === "in_progress") {
+					const warningEl = checkpointInfo.createEl("p", {
+						cls: "checkpoint-warning",
+					});
+					warningEl.createEl("strong", {
+						text: "⚠️ Previous sync was interrupted. You can resume from checkpoint.",
+					});
+				}
+			} catch (error) {
+				checkpointInfo.empty();
+				const errorMessage = error instanceof Error ? error.message : "Unknown error";
+				checkpointInfo.createEl("p", {
+					text: `Error loading checkpoint: ${errorMessage}`,
+					cls: "checkpoint-error",
+				});
+			}
+		};
+
+		// Load checkpoint info on display
+		void loadCheckpointInfo();
+
+		// T061: Add "Reset Checkpoint" button
+		new Setting(containerEl)
+			.setName("Reset Checkpoint")
+			.setDesc("Delete the checkpoint file and start fresh on next sync")
+			.addButton((button) =>
+				button
+					.setButtonText("Reset Checkpoint")
+					.setWarning() // Make button stand out as a destructive action
+					.onClick(async () => {
+						// T063: Implement resetCheckpoint action handler
+						await this.resetCheckpoint(loadCheckpointInfo);
+					}),
+			);
+
 		// Help Section
 		new Setting(containerEl).setName("Help & Resources").setHeading();
 
@@ -150,5 +219,68 @@ export class GitHubStargazerSettingTab extends PluginSettingTab {
 					);
 				}),
 			);
+	}
+
+	/**
+	 * Format checkpoint timestamp to human-readable age
+	 * T062: Helper method for checkpoint metadata display
+	 */
+	private formatCheckpointAge(timestamp?: string): string {
+		if (!timestamp) {
+			return "Unknown";
+		}
+
+		const checkpointDate = new Date(timestamp);
+		const now = new Date();
+		const ageMs = now.getTime() - checkpointDate.getTime();
+
+		// Calculate age in appropriate units
+		const seconds = Math.floor(ageMs / 1000);
+		const minutes = Math.floor(seconds / 60);
+		const hours = Math.floor(minutes / 60);
+		const days = Math.floor(hours / 24);
+
+		if (days > 0) {
+			return `${days} day${days !== 1 ? "s" : ""} ago`;
+		}
+		if (hours > 0) {
+			return `${hours} hour${hours !== 1 ? "s" : ""} ago`;
+		}
+		if (minutes > 0) {
+			return `${minutes} minute${minutes !== 1 ? "s" : ""} ago`;
+		}
+		return "Just now";
+	}
+
+	/**
+	 * Reset checkpoint - delete checkpoint file and refresh display
+	 * T063: Action handler for "Reset Checkpoint" button
+	 */
+	private async resetCheckpoint(
+		refreshCallback: () => Promise<void>,
+	): Promise<void> {
+		try {
+			const checkpointManager = new CheckpointManager(this.app);
+
+			// Check if checkpoint exists
+			const checkpoint = await checkpointManager.loadCheckpoint();
+			if (!checkpoint) {
+				new Notice("No checkpoint found to reset.");
+				return;
+			}
+
+			// Delete checkpoint
+			await checkpointManager.deleteCheckpoint();
+
+			// Show confirmation notice
+			new Notice("✓ Checkpoint deleted successfully. Next sync will start fresh.");
+
+			// Refresh display
+			await refreshCallback();
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : "Unknown error";
+			new Notice(`Failed to reset checkpoint: ${errorMessage}`);
+			console.error("[SettingsTab] Failed to reset checkpoint:", error);
+		}
 	}
 }

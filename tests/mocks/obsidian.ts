@@ -1,3 +1,5 @@
+import { vi } from "vitest";
+
 export type App = {
 	vault?: unknown;
 	workspace?: unknown;
@@ -211,3 +213,19 @@ export class Platform {
 	static isAndroidApp: boolean = false;
 	static isIosApp: boolean = false;
 }
+
+export interface RequestUrlOptions {
+	url: string;
+	method?: string;
+	headers?: Record<string, string>;
+	body?: string;
+}
+
+export interface RequestUrlResponse {
+	status: number;
+	text: string;
+	json: () => Promise<unknown>;
+	headers: Record<string, string>;
+}
+
+export const requestUrl = vi.fn();

@@ -72,11 +72,12 @@ export default class GitHubStargazerPlugin extends Plugin {
 		});
 
 		// Force full sync command
+		// T064: Updated to pass force flag which deletes checkpoint before syncing
 		this.addCommand({
-			id: `${COMMAND_IDS.SYNC}-force`,
-			name: `${COMMAND_NAMES.SYNC} (Force Full Sync)`,
+			id: "force-full-sync",
+			name: "Force full sync (delete checkpoint)",
 			callback: () => {
-				this.syncRepositories("initial").catch(err => console.error(err));
+				this.syncRepositories("initial", { force: true }).catch(err => console.error(err));
 			},
 		});
 
@@ -101,25 +102,37 @@ export default class GitHubStargazerPlugin extends Plugin {
 
 	/**
 	 * Sync repositories from GitHub
+	 * T066: Modified to accept options parameter with force flag
 	 */
 	private async syncRepositories(
 		mode: "initial" | "incremental" = "incremental",
+		options?: { force?: boolean },
 	) {
 		if (!this.settings.githubToken || this.settings.githubToken.trim() === "") {
 			new Notice(
-				 
 				"Please configure your GitHub token in settings first. Open Settings Community plugins → GitHub Stargazer.",
 			);
 			return;
 		}
 
 		try {
-			await this.syncCommand.execute(
-				this.settings.githubToken,
-				this.repositoryStore,
-				this.syncStateStore,
-				mode,
-			);
+			// T066: Pass force option to sync command
+			if (options?.force) {
+				await this.syncCommand.executeForceSync(
+					this.app,
+					this.settings.githubToken,
+					this.repositoryStore,
+					this.syncStateStore,
+				);
+			} else {
+				await this.syncCommand.execute(
+					this.app,
+					this.settings.githubToken,
+					this.repositoryStore,
+					this.syncStateStore,
+					mode,
+				);
+			}
 		} catch (error) {
 			// Error is already handled by syncCommand, but we can add additional logging here
 			console.error("[GitHub Stargazer] Sync error:", error);

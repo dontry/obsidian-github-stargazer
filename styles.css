@@ -6,3 +6,39 @@ available in the app when your plugin is enabled.
 If your plugin does not need CSS, delete this file.
 
 */
+
+/* Sync Progress Modal Styles (T057-T060) */
+.sync-progress-container {
+	padding: 20px;
+	min-width: 400px;
+}
+
+.sync-status {
+	font-size: 16px;
+	font-weight: 500;
+	margin-bottom: 15px;
+	text-align: center;
+}
+
+.sync-progress-bar-container {
+	width: 100%;
+	height: 24px;
+	background-color: var(--background-modifier-border);
+	border-radius: 12px;
+	overflow: hidden;
+	margin-bottom: 15px;
+}
+
+.sync-progress-bar {
+	height: 100%;
+	background: linear-gradient(90deg, var(--interactive-accent) 0%, var(--interactive-accent-hover) 100%);
+	transition: width 0.3s ease;
+	width: 0%;
+}
+
+.sync-stats {
+	font-size: 14px;
+	color: var(--text-muted);
+	text-align: center;
+	margin: 0;
+}

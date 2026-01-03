@@ -3,6 +3,7 @@ import { Notice } from "obsidian";
 import type { PluginSettings } from "@/types";
 
 const isTestEnvironment = () =>
+	// eslint-disable-next-line no-undef
 	typeof process !== "undefined" && process.env?.NODE_ENV === "test";
 
 /**

@@ -10,7 +10,6 @@ import type { SyncState } from "@/types";
 export class SyncStateStore {
 	private readonly STATE_FILE = "github-sync-state.json";
 	private app: App;
-	private cache: SyncState | null = null;
 
 	constructor(app: App) {
 		this.app = app;
@@ -26,14 +25,12 @@ export class SyncStateStore {
 			if (!data) {
 				// Return default state if file doesn't exist
 				const defaultState = this.getDefaultState();
-				this.cache = defaultState;
 				return defaultState;
 			}
 
 			const parsed = JSON.parse(data) as SyncState;
-			this.cache = parsed;
 			return parsed;
-		} catch (error) {
+		} catch {
 			// File doesn't exist or is invalid
 			return this.getDefaultState();
 		}
@@ -45,7 +42,6 @@ export class SyncStateStore {
 	async saveSyncState(state: SyncState): Promise<void> {
 		const content = JSON.stringify(state, null, 2);
 		await this.app.vault.adapter.write(this.STATE_FILE, content);
-		this.cache = state;
 	}
 
 	/**
@@ -55,6 +51,9 @@ export class SyncStateStore {
 		currentStep: string;
 		repositoriesProcessed: number;
 		totalRepositories: number;
+		isResuming?: boolean;
+		fetchedCount?: number;
+		convertedCount?: number;
 	}): Promise<void> {
 		const state = await this.loadSyncState();
 
@@ -67,6 +66,17 @@ export class SyncStateStore {
 						(progress.repositoriesProcessed / progress.totalRepositories) * 100,
 					)
 				: 0;
+
+		// T060: Save checkpoint info if provided
+		if (progress.isResuming !== undefined) {
+			state.isResuming = progress.isResuming;
+		}
+		if (progress.fetchedCount !== undefined) {
+			state.fetchedCount = progress.fetchedCount;
+		}
+		if (progress.convertedCount !== undefined) {
+			state.convertedCount = progress.convertedCount;
+		}
 
 		await this.saveSyncState(state);
 	}
@@ -138,7 +148,6 @@ export class SyncStateStore {
 	 * Clear the internal cache
 	 */
 	clearCache(): void {
-		this.cache = null;
 	}
 
 	/**

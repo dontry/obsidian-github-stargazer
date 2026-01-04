@@ -83,6 +83,28 @@ cp styles.css .obsidian/plugins/github-stargazer/  # if present
 
 The plugin automatically saves your sync progress, so you never lose work:
 
+```mermaid
+flowchart TD
+  Start[User starts sync] --> Check{Checkpoint exists?}
+  Check -- Yes --> Prompt[Prompt to resume or start fresh]
+  Prompt --> Decision{User choice}
+  Decision -- Resume --> Load[Load checkpoint state]
+  Decision -- Start fresh --> Reset[Delete checkpoint and reset counters]
+  Check -- No --> Init[Initialize new sync session]
+  Load --> Sync["Fetch starred repositories (paged)"]
+  Reset --> Sync
+  Init --> Sync
+  Sync --> Save[Save progress checkpoint]
+  Save --> More{More pages to fetch?}
+  More -- Yes --> Sync
+  More -- No --> Finalize[Write vault files and update cache]
+  Finalize --> Cleanup[Delete checkpoint and report success]
+  Sync --> Error{"Network/API error?"}
+  Error -- Yes --> Retry["Retry with backoff"]
+  Retry --> Sync
+  Error -- No --> Save
+```
+
 **What Gets Saved**:
 - Sync position (which page you're on)
 - Repositories fetched so far

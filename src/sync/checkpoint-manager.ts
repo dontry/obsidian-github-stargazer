@@ -1,8 +1,8 @@
 import type { App } from "obsidian";
-import { CheckpointValidationError } from "@/types";
-import type { SyncCheckpoint } from "@/types";
-import { info, warn, error, logSyncEvent } from "@/utils/logger";
 import { CheckpointValidator } from "@/sync/checkpoint-validator";
+import type { SyncCheckpoint } from "@/types";
+import { CheckpointValidationError } from "@/types";
+import { error, info, logSyncEvent, warn } from "@/utils/logger";
 
 /**
  * Checkpoint file name stored in plugin data directory
@@ -46,6 +46,58 @@ export class CheckpointManager {
 	 * @returns Checkpoint data, or null if file not found
 	 * @throws CheckpointValidationError if checkpoint is corrupted or invalid
 	 */
+	/**
+	 * Convert plain object to Map for README metadata
+	 *
+	 * README metadata is stored as a Map in memory but serialized as an object in JSON.
+	 * This helper converts the JSON representation back to a Map.
+	 *
+	 * @param obj - Plain object from JSON or undefined
+	 * @returns Map of repository → README metadata, or undefined if input is undefined
+	 */
+	private readmeMetadataObjectToMap(
+		obj: Record<string, unknown> | undefined,
+	): Map<string, import("@/types/readme").ReadmeMetadata> | undefined {
+		if (!obj) {
+			return undefined;
+		}
+
+		const map = new Map<string, import("@/types/readme").ReadmeMetadata>();
+
+		for (const [key, value] of Object.entries(obj)) {
+			if (value && typeof value === "object") {
+				map.set(key, value as import("@/types/readme").ReadmeMetadata);
+			}
+		}
+
+		return map;
+	}
+
+	/**
+	 * Convert Map to plain object for README metadata serialization
+	 *
+	 * README metadata is stored as a Map in memory but must be serialized as an object in JSON.
+	 * This helper converts the Map to a plain object for JSON.stringify().
+	 *
+	 * @param map - Map of repository → README metadata or undefined
+	 * @returns Plain object for JSON serialization or undefined
+	 */
+	private readmeMetadataMapToObject(
+		map: Map<string, import("@/types/readme").ReadmeMetadata> | undefined,
+	): Record<string, unknown> | undefined {
+		if (!map || map.size === 0) {
+			return undefined;
+		}
+
+		const obj: Record<string, unknown> = {};
+
+		for (const [key, value] of map.entries()) {
+			obj[key] = value;
+		}
+
+		return obj;
+	}
+
 	async loadCheckpoint(): Promise<SyncCheckpoint | null> {
 		try {
 			const data = await this.app.vault.adapter.read(CHECKPOINT_FILE);
@@ -80,6 +132,16 @@ export class CheckpointManager {
 				);
 			}
 
+			// Deserialize README metadata from object to Map
+			if (parsed && typeof parsed === "object") {
+				const data = parsed as Record<string, unknown>;
+				if (data.readmeMetadata && typeof data.readmeMetadata === "object") {
+					data.readmeMetadata = this.readmeMetadataObjectToMap(
+						data.readmeMetadata as Record<string, unknown>,
+					);
+				}
+			}
+
 			// Validate the parsed checkpoint
 			const validated = this.validator.validate(parsed);
 
@@ -87,15 +149,14 @@ export class CheckpointManager {
 				fetchedCount: validated.fetchedCount,
 				totalCount: validated.totalCount,
 				timestamp: validated.timestamp,
-			});
+			})
 
 			return validated;
 		} catch (err) {
 			// Check if file not found error (Obsidian throws generic error)
 			if (
 				err instanceof Error &&
-				(err.message.includes("ENOENT") ||
-					err.message.includes("not found"))
+				(err.message.includes("ENOENT") || err.message.includes("not found"))
 			) {
 				// No checkpoint exists yet (not an error)
 				return null;
@@ -164,7 +225,15 @@ export class CheckpointManager {
 				status: checkpoint.status || "in_progress",
 			};
 
-			const content = JSON.stringify(checkpointToSave, null, 2);
+			// Serialize README metadata Map to object for JSON
+			const checkpointForSerialization = {
+				...checkpointToSave,
+				readmeMetadata: this.readmeMetadataMapToObject(
+					checkpointToSave.readmeMetadata,
+				),
+			};
+
+			const content = JSON.stringify(checkpointForSerialization, null, 2);
 
 			// STEP 1: Write complete JSON to temp file
 			// If process crashes here, the actual checkpoint file is untouched
@@ -209,8 +278,7 @@ export class CheckpointManager {
 			// Ignore "file not found" errors (already deleted)
 			if (
 				err instanceof Error &&
-				(err.message.includes("ENOENT") ||
-					err.message.includes("not found"))
+				(err.message.includes("ENOENT") || err.message.includes("not found"))
 			) {
 				return;
 			}

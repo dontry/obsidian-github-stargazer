@@ -44,7 +44,7 @@ export const GET_STARRED_REPOSITORIES_QUERY = `
 							}
 							readme: object(expression: "HEAD:README.md") {
 								... on Blob {
-									text
+									oid
 								}
 							}
 							defaultBranchRef {
@@ -100,6 +100,7 @@ export const GET_REPOSITORY_BY_ID_QUERY = `
 				}
 				readme: object(expression: "HEAD:README.md") {
 					... on Blob {
+						oid
 						text
 					}
 				}
@@ -157,6 +158,7 @@ export interface GetStarredRepositoriesResponse {
 						url: string;
 					};
 					readme: {
+						oid: string;
 						text: string;
 					} | null;
 					defaultBranchRef: {
@@ -188,6 +190,7 @@ export interface GetRepositoryByIdResponse {
 			url: string;
 		};
 		readme: {
+			oid: string;
 			text: string;
 		} | null;
 		defaultBranchRef: {

@@ -1,8 +1,8 @@
 import { Notice } from "obsidian";
 import type { SyncStateStore } from "@/storage/sync-state-store";
-import { GitHubGraphQLClient } from "@/sync/github-client";
+import type { GitHubGraphQLClient } from "@/sync/github-client";
 import type { GetStarredRepositoriesResponse } from "@/sync/graphql-queries";
-import { RateLimiter } from "@/sync/rate-limiter";
+import type { RateLimiter } from "@/sync/rate-limiter";
 import type { Repository, SyncCheckpoint } from "@/types";
 import { DEFAULT_PAGE_SIZE } from "@/utils/constants";
 import { info } from "@/utils/logger";
@@ -61,11 +61,10 @@ export class SyncPageFetcher {
 			}
 
 			// Fetch page
-			const response =
-				await this.githubClient.fetchStarredRepositories(
-					cursor,
-					DEFAULT_PAGE_SIZE,
-				);
+			const response = await this.githubClient.fetchStarredRepositories(
+				cursor,
+				DEFAULT_PAGE_SIZE,
+			);
 
 			// Update rate limit info from response extensions
 			if (response.extensions?.rateLimit) {
@@ -73,15 +72,12 @@ export class SyncPageFetcher {
 				this.rateLimiter.trackQuery(
 					rateLimit.cost,
 					rateLimit.remaining,
-					rateLimit.resetAt
-						? new Date(rateLimit.resetAt)
-						: undefined,
+					rateLimit.resetAt ? new Date(rateLimit.resetAt) : undefined,
 				);
 			}
 
 			// Transform and collect repositories
-			const pageRepositories =
-				this.transformGitHubResponse(response.data);
+			const pageRepositories = this.transformGitHubResponse(response.data);
 			repositories.push(...pageRepositories);
 
 			// Lifecycle logging - page fetched
@@ -91,8 +87,7 @@ export class SyncPageFetcher {
 			});
 
 			// Update checkpoint after each page
-			const pageInfo =
-				response.data.viewer.starredRepositories.pageInfo;
+			const pageInfo = response.data.viewer.starredRepositories.pageInfo;
 			cursor = pageInfo.hasNextPage ? pageInfo.endCursor : null;
 
 			await updateCheckpoint(pageRepositories, cursor);
@@ -144,7 +139,7 @@ export class SyncPageFetcher {
 				createdAt: node.createdAt,
 				updatedAt: node.updatedAt,
 				starredAt: edge.starredAt,
-				readme: node.readme?.text || null,
+				readmeSha: node.readme?.oid ?? null,
 				tags: [],
 				linkedResources: [],
 			};

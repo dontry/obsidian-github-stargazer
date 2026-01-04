@@ -19,7 +19,7 @@ describe("Plugin Lifecycle", () => {
 
 	beforeEach(() => {
 		mockPlugin = createMockPlugin();
-		plugin = new GitHubStargazerPlugin(mockPlugin.app, {} as any);
+		plugin = new GitHubStargazerPlugin(mockPlugin.app, mockPlugin as any);
 	});
 
 	describe("onload", () => {
@@ -65,7 +65,10 @@ describe("Plugin Lifecycle", () => {
 				maxRepositoryCacheSize: 500,
 			};
 
-			vi.mocked(mockPlugin.loadData).mockResolvedValue(mockSettings);
+			// Mock the plugin's loadData method (inherited from Plugin)
+			const loadDataSpy = vi
+				.spyOn(plugin, "loadData")
+				.mockResolvedValue(mockSettings);
 
 			await plugin.onload();
 
@@ -75,6 +78,8 @@ describe("Plugin Lifecycle", () => {
 				"ghp_test_token_123456789012345678901234567890",
 			);
 			expect(settings.autoSyncEnabled).toBe(true);
+
+			loadDataSpy.mockRestore();
 		});
 	});
 

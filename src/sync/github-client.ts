@@ -1,10 +1,27 @@
-import { requestUrl } from "obsidian";
+import { type RequestUrlResponse, requestUrl } from "obsidian";
+import {
+	GITHUB_README_API_URL,
+	README_FETCH_TIMEOUT,
+	README_MAX_FILE_SIZE,
+} from "@/config/readme-config";
 import type {
 	GetStarredRepositoriesResponse,
 	GitHubGraphQLResult,
 	UnstarRepositoryResponse,
 } from "@/sync/graphql-queries";
+import {
+	AccessDeniedError,
+	RateLimitError,
+	ReadmeEncodingError,
+	ReadmeNetworkError,
+	ReadmeNotFoundError,
+	ReadmeTimeoutError,
+	ReadmeTooLargeError,
+} from "@/types/errors";
+import type { GitHubReadmeResponse } from "@/types/readme";
 import { GITHUB_GRAPHQL_API_URL } from "@/utils/constants";
+import { extractShaFromResponse, validateShaFormat } from "@/utils/sha";
+import { validateReadmeSize } from "@/utils/validation";
 
 /**
  * Retry configuration for transient errors
@@ -61,11 +78,9 @@ export class GitHubGraphQLClient {
 			});
 		});
 
-		const data =
-
-			(response.json) as unknown as {
-				data?: { viewer?: { starredRepositories?: { totalCount: number } } };
-			};
+		const data = response.json as unknown as {
+			data?: { viewer?: { starredRepositories?: { totalCount: number } } };
+		};
 
 		if (!data?.data?.viewer?.starredRepositories?.totalCount) {
 			throw new Error("Failed to fetch total starred repositories count");
@@ -122,8 +137,7 @@ export class GitHubGraphQLClient {
 				err.message.includes("401") ||
 				err.message.includes("Authentication failed");
 			const isForbiddenError =
-				err.message.includes("403") ||
-				err.message.includes("Forbidden");
+				err.message.includes("403") || err.message.includes("Forbidden");
 
 			if (isAuthError || isForbiddenError) {
 				// Fatal errors - fail immediately without retry
@@ -240,10 +254,13 @@ export class GitHubGraphQLClient {
 						"Rate limit exceeded. Please wait before syncing again.",
 					);
 				}
-				throw new Error(`GitHub API request failed: ${response.status} ${response.text}`);
+				throw new Error(
+					`GitHub API request failed: ${response.status} ${response.text}`,
+				);
 			}
 
-			const data = response.json as GitHubGraphQLResult<GetStarredRepositoriesResponse>;
+			const data =
+				response.json as GitHubGraphQLResult<GetStarredRepositoriesResponse>;
 
 			if (data.errors?.length) {
 				throw new Error(`GraphQL errors: ${JSON.stringify(data.errors)}`);
@@ -286,6 +303,153 @@ export class GitHubGraphQLClient {
 
 		if (data.errors?.length) {
 			throw new Error(`GraphQL errors: ${JSON.stringify(data.errors)}`);
+		}
+	}
+
+	/**
+	 * Fetch README from GitHub REST API
+	 *
+	 * GET api.github.com/repos/{owner}/{repo}/readme
+	 * Returns decoded README content with SHA for change detection.
+	 *
+	 * Handles:
+	 * - Base64 decoding of README content
+	 * - SHA extraction for change detection
+	 * - Error classification (404, 403, rate limit, etc.)
+	 * - Size validation (max 5MB)
+	 * - Encoding error handling
+	 *
+	 * @param owner - Repository owner/organization
+	 * @param repo - Repository name
+	 * @returns README content and SHA
+	 * @throws {ReadmeNotFoundError} if repository has no README (404)
+	 * @throws {RateLimitError} if rate limit exceeded (403 with retry-after)
+	 * @throws {AccessDeniedError} if access denied (403/401)
+	 * @throws {ReadmeTooLargeError} if README exceeds size limit
+	 * @throws {ReadmeEncodingError} if content cannot be decoded
+	 * @throws {ReadmeTimeoutError} if request times out
+	 * @throws {ReadmeNetworkError} for other network errors
+	 */
+	async fetchReadme(
+		owner: string,
+		repo: string,
+	): Promise<{
+		content: string;
+		sha: string;
+		originalFileName: string;
+		size: number;
+	}> {
+		const repository = `${owner}/${repo}`;
+		const url = GITHUB_README_API_URL.replace("{owner}", owner).replace(
+			"{repo}",
+			repo,
+		);
+
+		try {
+			// Fetch README from GitHub REST API with timeout
+			const response = await Promise.race<RequestUrlResponse>([
+				requestUrl({
+					url,
+					method: "GET",
+					headers: {
+						Authorization: `Bearer ${this.token}`,
+						Accept: "application/vnd.github.v3+json",
+					},
+				}),
+				new Promise<RequestUrlResponse>((_, reject) =>
+					setTimeout(
+						() => reject(new Error("Timeout")),
+						README_FETCH_TIMEOUT * 1000,
+					),
+				),
+			]);
+
+			// Handle 404 - Repository has no README
+			if (response.status === 404) {
+				throw new ReadmeNotFoundError(repository);
+			}
+
+			// Handle 403 - Rate limit or access denied
+			if (response.status === 403) {
+				const retryAfter = response.headers["retry-after"];
+				if (retryAfter) {
+					throw new RateLimitError(repository, parseInt(retryAfter, 10));
+				}
+				throw new AccessDeniedError(repository, 403);
+			}
+
+			// Handle 401 - Unauthorized
+			if (response.status === 401) {
+				throw new AccessDeniedError(repository, 401);
+			}
+
+			// Handle other errors
+			if (response.status !== 200) {
+				throw new Error(
+					`GitHub README API error: ${response.status} ${response.text}`,
+				);
+			}
+
+			// Parse response
+			const data = response.json as GitHubReadmeResponse;
+
+			// Validate and extract SHA
+			const sha = extractShaFromResponse(data);
+			validateShaFormat(sha);
+
+			// Validate size
+			validateReadmeSize(data.size, repository);
+
+			// Decode base64 content
+			let content: string;
+			try {
+				// GitHub returns base64 with URL-safe characters
+				// Need to convert to standard base64
+				const base64Content = data.content
+					.replace(/-/g, "+")
+					.replace(/_/g, "/");
+				const decoded = atob(base64Content);
+
+				// Convert bytes to UTF-8 string
+				const bytes = new Uint8Array(decoded.length);
+				for (let i = 0; i < decoded.length; i++) {
+					bytes[i] = decoded.charCodeAt(i);
+				}
+				content = new TextDecoder("utf-8").decode(bytes);
+			} catch (error) {
+				throw new ReadmeEncodingError(repository, data.encoding);
+			}
+
+			// Validate content
+			if (!content || content.length === 0) {
+				throw new ReadmeEncodingError(repository, data.encoding);
+			}
+
+			return {
+				content,
+				sha,
+				originalFileName: data.name,
+				size: data.size,
+			};
+		} catch (error) {
+			// Re-throw our custom errors as-is
+			if (
+				error instanceof ReadmeNotFoundError ||
+				error instanceof RateLimitError ||
+				error instanceof AccessDeniedError ||
+				error instanceof ReadmeTooLargeError ||
+				error instanceof ReadmeEncodingError
+			) {
+				throw error;
+			}
+
+			// Handle timeout
+			if (error instanceof Error && error.message === "Timeout") {
+				throw new ReadmeTimeoutError(repository, README_FETCH_TIMEOUT);
+			}
+
+			// Wrap other errors in ReadmeNetworkError
+			throw new ReadmeNetworkError(repository, error);
 		}
 	}
 }

@@ -93,6 +93,54 @@ export class CheckpointValidator {
 			});
 		}
 
+		// Validate optional field: readmeMetadata
+		if ("readmeMetadata" in data && data.readmeMetadata != null) {
+			// readmeMetadata can be either a Map (after deserialization) or an object (from JSON)
+			const isMap =
+				data.readmeMetadata instanceof Map ||
+				(typeof data.readmeMetadata === "object" &&
+					!Array.isArray(data.readmeMetadata));
+
+			if (!isMap) {
+				throw new CheckpointValidationError(
+					"Checkpoint readmeMetadata must be an object or Map",
+					"invalid_format",
+					true,
+				);
+			}
+
+			// Transform SUCCESS to NOT_AVAILABLE when sha/vaultFilePath are empty (no README exists)
+			if (data.readmeMetadata instanceof Map) {
+				for (const [repo, metadata] of data.readmeMetadata.entries()) {
+					if (
+						metadata &&
+						typeof metadata === "object" &&
+						metadata.fetchStatus === "success" &&
+						!metadata.sha &&
+						!metadata.vaultFilePath
+					) {
+						// Transform to NOT_AVAILABLE status
+						(metadata as Record<string, unknown>).fetchStatus =
+							"not_available";
+					}
+				}
+			} else if (typeof data.readmeMetadata === "object") {
+				for (const [repo, metadata] of Object.entries(data.readmeMetadata)) {
+					if (
+						metadata &&
+						typeof metadata === "object" &&
+						metadata.fetchStatus === "success" &&
+						!metadata.sha &&
+						!metadata.vaultFilePath
+					) {
+						// Transform to NOT_AVAILABLE status
+						(metadata as Record<string, unknown>).fetchStatus =
+							"not_available";
+					}
+				}
+			}
+		}
+
 		// Consistency check: fetchedCount vs repositories.length
 		const repositories = data.repositories as unknown[];
 		const fetchedCount = data.fetchedCount;

@@ -54,7 +54,7 @@ describe("SettingsTab - Checkpoint Management (T053-T054)", () => {
 					createdAt: "2024-01-01T00:00:00Z",
 					updatedAt: "2024-01-02T00:00:00Z",
 					starredAt: "2024-01-01T00:00:00Z",
-					readme: "# Test",
+					readmeSha: "# Test",
 					tags: [],
 					linkedResources: [],
 				},

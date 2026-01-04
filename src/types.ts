@@ -29,14 +29,18 @@ export interface Repository {
 	updatedAt: string;
 	/** When user starred this repo (ISO8601) */
 	starredAt: string;
-	/** README.md content in markdown (optional) */
-	readme: string | null;
 	/** Array of tag names applied to this repo */
 	tags: string[];
 	/** External documentation links */
 	linkedResources: LinkedResource[];
 	/** Whether the repo has been un-starred but kept locally */
 	isUnstarred?: boolean;
+	/** SHA hash of the README content from GitHub API (for change detection) */
+	readmeSha: string | null;
+	/** Path to the README markdown file in the vault root (e.g., "facebook-react-README.md") */
+	readmeVaultFilePath?: string; 
+	/** Whether the user has manually edited the README file in the vault */
+	localReadmeModified?: boolean;
 }
 
 /**
@@ -194,6 +198,8 @@ export interface SyncCheckpoint {
 	status?: SyncStatus;
 	/** UUID uniquely identifying this sync attempt (optional) */
 	sessionId?: string;
+	/** README metadata for each repository (repo ID → README metadata) */
+	readmeMetadata?: Map<string, import('./types/readme.js').ReadmeMetadata>;
 }
 
 /**

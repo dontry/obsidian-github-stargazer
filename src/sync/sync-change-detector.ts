@@ -60,7 +60,7 @@ export class SyncChangeDetector {
 			existing.starCount !== current.starCount ||
 			existing.description !== current.description ||
 			existing.primaryLanguage !== current.primaryLanguage ||
-			existing.readme !== current.readme
+			existing.readmeSha !== current.readmeSha
 		);
 	}
 }

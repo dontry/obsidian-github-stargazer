@@ -1,17 +1,19 @@
-import { Notice } from "obsidian";
 import type { App } from "obsidian";
+import { Notice } from "obsidian";
 import type { RepositoryStore } from "@/storage/repository-store";
 import type { SyncStateStore } from "@/storage/sync-state-store";
+import { VaultFileManager } from "@/storage/vault-file-manager";
 import { GitHubGraphQLClient } from "@/sync/github-client";
 import { RateLimiter } from "@/sync/rate-limiter";
+import { ReadmeFetcher } from "@/sync/readme-fetcher";
 import { SyncChangeDetector } from "@/sync/sync-change-detector";
 import { SyncCheckpointHandler } from "@/sync/sync-checkpoint-handler";
-import { SyncResumeHandler } from "@/sync/sync-resume";
 import { SyncPageFetcher } from "@/sync/sync-page-fetcher";
+import { SyncResumeHandler } from "@/sync/sync-resume";
 import type { Repository, SyncCheckpoint } from "@/types";
-import { checkDiskSpace } from "@/utils/disk-check";
 import { ERROR_MESSAGES } from "@/utils/constants";
-import { info, error } from "@/utils/logger";
+import { checkDiskSpace } from "@/utils/disk-check";
+import { error, info, warn } from "@/utils/logger";
 
 /**
  * Sync service for managing GitHub starred repositories synchronization
@@ -28,6 +30,8 @@ export class SyncService {
 	private resumeHandler: SyncResumeHandler;
 	private pageFetcher: SyncPageFetcher;
 	private changeDetector: SyncChangeDetector;
+	private readmeFetcher: ReadmeFetcher;
+	private vaultManager: VaultFileManager;
 	private app: App;
 
 	constructor(
@@ -41,16 +45,19 @@ export class SyncService {
 		this.rateLimiter = new RateLimiter();
 		this.repositoryStore = repositoryStore;
 		this.syncStateStore = syncStateStore;
-		this.checkpointHandler = new SyncCheckpointHandler(
-			app,
-			repositoryStore,
-		);
+		this.checkpointHandler = new SyncCheckpointHandler(app, repositoryStore);
 		this.pageFetcher = new SyncPageFetcher(
 			this.githubClient,
 			this.rateLimiter,
 			syncStateStore,
 		);
 		this.changeDetector = new SyncChangeDetector();
+		this.vaultManager = new VaultFileManager(app);
+		this.readmeFetcher = new ReadmeFetcher(
+			this.githubClient,
+			this.vaultManager,
+			new Map(),
+		);
 		this.resumeHandler = new SyncResumeHandler(
 			app,
 			this.githubClient,
@@ -97,6 +104,16 @@ export class SyncService {
 			};
 			await this.checkpointHandler.syncCheckpoint(currentCheckpoint);
 
+			// Initialize README fetcher with metadata from checkpoint (if resuming)
+			const readmeMetadata = currentCheckpoint.readmeMetadata
+				? new Map(currentCheckpoint.readmeMetadata)
+				: new Map();
+			this.readmeFetcher = new ReadmeFetcher(
+				this.githubClient,
+				this.vaultManager,
+				readmeMetadata,
+			);
+
 			// Fetch all pages of repositories
 			const repositories = await this.pageFetcher.fetchAllPages(
 				null,
@@ -115,6 +132,82 @@ export class SyncService {
 				false, // Not resuming
 			);
 
+			// Fetch READMEs for all repositories in parallel
+			info("Fetching READMEs for repositories in parallel", {
+				count: repositories.length,
+			});
+			const readmeResults = await this.readmeFetcher.fetchReadmesInParallel(
+				repositories,
+				{
+					onProgress: (repository, status) => {
+						// Log progress for each repository
+						if (status.skipped) {
+							if (status.skipReason === "sha_unchanged") {
+								info("README unchanged, skipping fetch", {
+									repository,
+								});
+							} else if (status.skipReason === "not_available") {
+								info("Repository has no README", {
+									repository,
+								});
+							}
+						} else if (status.success) {
+							info("README fetched successfully", {
+								repository,
+							});
+						} else {
+							warn("README fetch failed", {
+								repository,
+								error: status.error?.message,
+							});
+						}
+					},
+				},
+			);
+
+			// Calculate statistics from results
+			let successCount = 0;
+			let skippedCount = 0;
+			let failedCount = 0;
+			let notAvailableCount = 0;
+
+			for (const result of readmeResults) {
+				if (result.skipped) {
+					if (result.skipReason === "sha_unchanged") {
+						skippedCount++;
+					} else if (result.skipReason === "not_available") {
+						notAvailableCount++;
+					}
+				} else if (result.success) {
+					successCount++;
+				} else {
+					failedCount++;
+				}
+			}
+
+			// Log summary statistics
+			info("Parallel README fetching completed", {
+				total: repositories.length,
+				success: successCount,
+				skipped: skippedCount,
+				notAvailable: notAvailableCount,
+				failed: failedCount,
+			});
+
+			// Show notice to user
+			const noticeMessage = `READMEs: ${successCount} new/updated, ${skippedCount} unchanged, ${notAvailableCount} not available`;
+			if (failedCount > 0) {
+				new Notice(`${noticeMessage}, ${failedCount} failed`);
+			} else {
+				new Notice(noticeMessage);
+			}
+
+			// Update checkpoint with README metadata before completion
+			if (currentCheckpoint) {
+				currentCheckpoint.readmeMetadata = this.readmeFetcher.getMetadata();
+				await this.checkpointHandler.syncCheckpoint(currentCheckpoint);
+			}
+
 			// Delete checkpoint on sync completion
 			await this.checkpointHandler.deleteCheckpoint();
 			info("Checkpoint deleted - sync complete");
@@ -129,8 +222,7 @@ export class SyncService {
 			return repositories;
 		} catch (err) {
 			// Error logging without sensitive data
-			const errorMessage =
-				err instanceof Error ? err.message : "Unknown error";
+			const errorMessage = err instanceof Error ? err.message : "Unknown error";
 			error("Sync failed", {
 				error: errorMessage,
 				fetchedCount: currentCheckpoint?.fetchedCount || 0,
@@ -185,8 +277,7 @@ export class SyncService {
 
 			return changes;
 		} catch (err) {
-			const errorMessage =
-				err instanceof Error ? err.message : "Unknown error";
+			const errorMessage = err instanceof Error ? err.message : "Unknown error";
 			await this.syncStateStore.markSyncFailed(errorMessage);
 			new Notice(`Incremental sync failed: ${errorMessage}`);
 			throw err;
@@ -199,8 +290,7 @@ export class SyncService {
 	 */
 	async syncWithResume(): Promise<Repository[]> {
 		// Load existing checkpoint
-		const checkpoint =
-			await this.checkpointHandler.loadCheckpointIfExists();
+		const checkpoint = await this.checkpointHandler.loadCheckpointIfExists();
 
 		if (checkpoint) {
 			// Show confirmation modal
@@ -209,9 +299,7 @@ export class SyncService {
 
 			if (resume) {
 				// Resume from checkpoint
-				return await this.resumeHandler.performResumeSync(
-					checkpoint,
-				);
+				return await this.resumeHandler.performResumeSync(checkpoint);
 			} else {
 				// User chose fresh sync
 				return await this.syncFresh();
@@ -237,6 +325,104 @@ export class SyncService {
 		} catch (err) {
 			error("Failed to start fresh sync", err);
 			throw err;
+		}
+	}
+
+	/**
+	 * Fetch READMEs for all repositories
+	 *
+	 * This method iterates through repositories and fetches READMEs if they have changed.
+	 * Errors are handled gracefully - sync continues even if individual README fetches fail.
+	 *
+	 * @param repositories - List of repositories to fetch READMEs for
+	 */
+	private async fetchReadmesForRepositories(
+		repositories: Repository[],
+	): Promise<void> {
+		let successCount = 0;
+		let skippedCount = 0;
+		let failedCount = 0;
+		let notAvailableCount = 0;
+
+		for (const repo of repositories) {
+			// Parse owner and repo from nameWithOwner
+			const [owner, repoName] = repo.nameWithOwner.split("/");
+
+			if (!owner || !repoName) {
+				warn("Invalid repository name format", {
+					nameWithOwner: repo.nameWithOwner,
+				});
+				continue;
+			}
+
+			try {
+				const result = await this.readmeFetcher.fetchReadmeIfChanged(
+					owner,
+					repoName,
+					{
+						onProgress: (repository, status) => {
+							// Log progress for each repository
+							if (status.skipped) {
+								if (status.skipReason === "sha_unchanged") {
+									info("README unchanged, skipping fetch", {
+										repository,
+									});
+								} else if (status.skipReason === "not_available") {
+									info("Repository has no README", {
+										repository,
+									});
+								}
+							} else if (status.success) {
+								info("README fetched successfully", {
+									repository,
+								});
+							} else {
+								warn("README fetch failed", {
+									repository,
+									error: status.error?.message,
+								});
+							}
+						},
+					},
+				);
+
+				// Track statistics
+				if (result?.skipped) {
+					if (result.skipReason === "sha_unchanged") {
+						skippedCount++;
+					} else if (result.skipReason === "not_available") {
+						notAvailableCount++;
+					}
+				} else if (result?.success) {
+					successCount++;
+				} else {
+					failedCount++;
+				}
+			} catch (err) {
+				// Individual README fetch errors should not fail the entire sync
+				warn("Failed to fetch README for repository", {
+					repository: repo.nameWithOwner,
+					error: err instanceof Error ? err.message : "Unknown error",
+				});
+				failedCount++;
+			}
+		}
+
+		// Log summary statistics
+		info("README fetching completed", {
+			total: repositories.length,
+			success: successCount,
+			skipped: skippedCount,
+			notAvailable: notAvailableCount,
+			failed: failedCount,
+		});
+
+		// Show notice to user
+		const noticeMessage = `READMEs: ${successCount} new/updated, ${skippedCount} unchanged, ${notAvailableCount} not available`;
+		if (failedCount > 0) {
+			new Notice(`${noticeMessage}, ${failedCount} failed`);
+		} else {
+			new Notice(noticeMessage);
 		}
 	}
 }

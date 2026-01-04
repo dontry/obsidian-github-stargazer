@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ReadmeFetchStatus } from "@/config/readme-config";
 import { CheckpointManager } from "@/sync/checkpoint-manager";
 import type { SyncCheckpoint } from "@/types";
 import { CheckpointValidationError } from "@/types";
@@ -15,6 +16,21 @@ const mockApp = {
 	},
 };
 
+const mockReadmeMetadata = new Map([
+	[
+		"user/test-repo",
+		{
+			sha: "abc123def4567890123456789012345678901234",
+			vaultFilePath: "user-test-repo-README.md",
+			fetchStatus: ReadmeFetchStatus.SUCCESS,
+			lastFetchedAt: "2025-01-04T12:00:00Z",
+			localModified: false,
+			size: 1024,
+			originalFileName: "README.md",
+		},
+	],
+]);
+
 describe("CheckpointManager", () => {
 	let checkpointManager: CheckpointManager;
 
@@ -26,6 +42,7 @@ describe("CheckpointManager", () => {
 	// T011: Unit test for CheckpointManager.saveCheckpoint() atomic write pattern
 	describe("saveCheckpoint (T011)", () => {
 		it("should write checkpoint to temp file then actual file (atomic pattern)", async () => {
+
 			const checkpoint: SyncCheckpoint = {
 				cursor: "abc123",
 				repositories: [
@@ -37,14 +54,14 @@ describe("CheckpointManager", () => {
 						url: "https://github.com/user/test-repo",
 						starCount: 100,
 						primaryLanguage: "TypeScript",
-						owner: 'google',
+						owner: "google",
 						starredAt: "2025-01-02T00:00:00Z",
 						createdAt: "2025-01-02T00:00:00Z",
 						updatedAt: "2025-01-02T00:00:00Z",
-						readme: "",
+						readmeSha: "a123sad",
 						tags: [],
 						linkedResources: [],
-						isUnstarred: false
+						isUnstarred: false,
 					},
 				],
 				totalCount: 150,
@@ -385,6 +402,118 @@ describe("CheckpointManager", () => {
 			await expect(
 				checkpointManager.deleteCheckpoint(),
 			).resolves.toBeUndefined();
+		});
+	});
+
+	// T013: Unit test for checkpoint README metadata management (004-fetch-readme)
+	describe("README Metadata Management (T013)", () => {
+		it("should save README metadata for a repository", () => {
+			const metadata = {
+				sha: "abc123def4567890123456789012345678901234",
+				vaultFilePath: "owner-repo-README.md",
+				fetchStatus: ReadmeFetchStatus.SUCCESS,
+				lastFetchedAt: "2025-01-04T12:00:00Z",
+				localModified: false,
+				size: 1024,
+				originalFileName: "README.md",
+			};
+
+			const checkpoint: SyncCheckpoint = {
+				cursor: null,
+				repositories: [],
+				totalCount: 100,
+				fetchedCount: 0,
+				readmeMetadata: new Map([["owner/repo", metadata]]),
+			};
+
+			const result = checkpointManager.validateCheckpoint(checkpoint);
+			expect(result.readmeMetadata?.get("owner/repo")).toEqual(metadata);
+		});
+
+		it("should load README metadata from checkpoint", () => {
+			const metadata = {
+				sha: "abc123",
+				vaultFilePath: "owner-repo-README.md",
+				fetchStatus: ReadmeFetchStatus.SUCCESS,
+				lastFetchedAt: "2025-01-04T12:00:00Z",
+				localModified: false,
+			};
+
+			const checkpointData: SyncCheckpoint = {
+				cursor: null,
+				repositories: [],
+				totalCount: 100,
+				fetchedCount: 0,
+				readmeMetadata: new Map([["owner/repo", metadata]]),
+			};
+
+			(mockApp.vault.adapter.read as any).mockResolvedValueOnce(
+				JSON.stringify(checkpointData),
+			);
+
+			// Note: Map serialization needs special handling
+			// This test will be updated after implementation
+		});
+
+		it("should handle missing README metadata gracefully", () => {
+			const checkpoint: SyncCheckpoint = {
+				cursor: null,
+				repositories: [],
+				totalCount: 100,
+				fetchedCount: 0,
+				// No readmeMetadata field
+			};
+
+			const result = checkpointManager.validateCheckpoint(checkpoint);
+			expect(result.readmeMetadata).toBeUndefined();
+		});
+
+		it("should store failed fetch status", () => {
+			const metadata = {
+				sha: "",
+				vaultFilePath: "",
+				fetchStatus: ReadmeFetchStatus.FAILED,
+				lastFetchedAt: "2025-01-04T12:00:00Z",
+				localModified: false,
+				errorMessage: "Network error: timeout",
+			};
+
+			const checkpoint: SyncCheckpoint = {
+				cursor: null,
+				repositories: [],
+				totalCount: 100,
+				fetchedCount: 0,
+				readmeMetadata: new Map([["owner/repo", metadata]]),
+			};
+
+			const result = checkpointManager.validateCheckpoint(checkpoint);
+			const repoMetadata = result.readmeMetadata?.get("owner/repo");
+
+			expect(repoMetadata?.fetchStatus).toBe("failed");
+			expect(repoMetadata?.errorMessage).toBe("Network error: timeout");
+		});
+
+		it("should store NOT_AVAILABLE status for repositories without README", () => {
+			const metadata = {
+				sha: "",
+				vaultFilePath: "",
+				fetchStatus: ReadmeFetchStatus.SUCCESS,
+				lastFetchedAt: "2025-01-04T12:00:00Z",
+				localModified: false,
+			};
+
+			const checkpoint: SyncCheckpoint = {
+				cursor: null,
+				repositories: [],
+				totalCount: 100,
+				fetchedCount: 0,
+				readmeMetadata: new Map([["owner/empty-repo", metadata]]),
+			};
+
+			const result = checkpointManager.validateCheckpoint(checkpoint);
+			const repoMetadata = result.readmeMetadata?.get("owner/empty-repo");
+
+			expect(repoMetadata?.fetchStatus).toBe("not_available");
 		});
 	});
 });

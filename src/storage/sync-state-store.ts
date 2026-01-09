@@ -2,17 +2,67 @@ import type { App } from "obsidian";
 import type { SyncState } from "@/types";
 
 /**
+ * Event types emitted by SyncStateStore
+ */
+export type SyncStateEvent = "progress" | "started" | "completed" | "failed";
+
+/**
+ * Listener callback for sync state events
+ */
+export type SyncStateListener = (state: SyncState) => void;
+
+/**
  * Storage layer for sync state
  *
  * Manages loading, saving, and updating sync state including progress tracking
- * and last sync information.
+ * and last sync information. Emits events when state changes for reactive updates.
  */
 export class SyncStateStore {
 	private readonly STATE_FILE = "github-sync-state.json";
 	private app: App;
+	private listeners: Map<SyncStateEvent, Set<SyncStateListener>>;
 
 	constructor(app: App) {
 		this.app = app;
+		this.listeners = new Map();
+	}
+
+	/**
+	 * Subscribe to sync state events
+	 * @param event - The event type to listen for
+	 * @param listener - Callback function that receives the updated state
+	 * @returns Unsubscribe function
+	 */
+	on(event: SyncStateEvent, listener: SyncStateListener): () => void {
+		if (!this.listeners.has(event)) {
+			this.listeners.set(event, new Set());
+		}
+		this.listeners.get(event)!.add(listener);
+
+		// Return unsubscribe function
+		return () => {
+			this.listeners.get(event)?.delete(listener);
+		};
+	}
+
+	/**
+	 * Emit an event to all listeners
+	 */
+	private emit(event: SyncStateEvent, state: SyncState): void {
+		this.listeners.get(event)?.forEach((listener) => {
+			try {
+				listener(state);
+			} catch (error) {
+				console.error(`[SyncStateStore] Error in ${event} listener:`, error);
+			}
+		});
+	}
+
+	/**
+	 * Remove all event listeners
+	 */
+	removeAllListeners(): void {
+		this.listeners.clear();
 	}
 
 	/**
@@ -79,6 +129,7 @@ export class SyncStateStore {
 		}
 
 		await this.saveSyncState(state);
+		this.emit("progress", state);
 	}
 
 	/**
@@ -95,6 +146,7 @@ export class SyncStateStore {
 		state.error = null;
 
 		await this.saveSyncState(state);
+		this.emit("started", state);
 	}
 
 	/**
@@ -120,6 +172,7 @@ export class SyncStateStore {
 		}
 
 		await this.saveSyncState(state);
+		this.emit("completed", state);
 	}
 
 	/**
@@ -134,6 +187,7 @@ export class SyncStateStore {
 		state.endTime = new Date().toISOString();
 
 		await this.saveSyncState(state);
+		this.emit("failed", state);
 	}
 
 	/**

@@ -1,5 +1,9 @@
 import { type App, Modal, Notice } from "obsidian";
-import type { SyncStateStore } from "@/storage/sync-state-store";
+import type {
+	SyncStateListener,
+	SyncStateStore,
+} from "@/storage/sync-state-store";
+import type { SyncState } from "@/types";
 
 // Extend Window interface to include app property (Obsidian global)
 declare global {
@@ -13,10 +17,14 @@ declare global {
  *
  * Displays real-time sync progress including current step,
  * progress bar, repositories processed, and estimated time remaining.
+ * Uses reactive event-based updates instead of polling.
  */
 export class SyncProgressModal extends Modal {
 	private syncStateStore: SyncStateStore;
-	private pollInterval: number | null = null;
+	private unsubscribeProgress: (() => void) | null = null;
+	private unsubscribeStarted: (() => void) | null = null;
+	private unsubscribeCompleted: (() => void) | null = null;
+	private unsubscribeFailed: (() => void) | null = null;
 	private progressEl: HTMLElement | null = null;
 	private statusEl: HTMLElement | null = null;
 	private statsEl: HTMLElement | null = null;
@@ -28,7 +36,7 @@ export class SyncProgressModal extends Modal {
 	}
 
 	/**
-	 * Open the modal and start polling for updates
+	 * Open the modal and subscribe to state updates
 	 */
 	onOpen(): void {
 		const { contentEl } = this;
@@ -52,40 +60,70 @@ export class SyncProgressModal extends Modal {
 		this.statsEl = container.createEl("p", { cls: "sync-stats" });
 		this.statsEl.setText("");
 
-		// Start polling
-		this.startPolling();
+		// Subscribe to state changes
+		this.subscribeToUpdates();
+
+		// Initial update
+		void this.updateDisplay();
 	}
 
 	/**
-	 * Close the modal and stop polling
+	 * Close the modal and unsubscribe from state updates
 	 */
 	onClose(): void {
-		this.stopPolling();
+		this.unsubscribeFromUpdates();
 		const { contentEl } = this;
 		contentEl.empty();
 	}
 
 	/**
-	 * Start polling for sync state updates
+	 * Subscribe to reactive state updates
 	 */
-	private startPolling(): void {
-		// Initial update
-		void this.updateDisplay();
-
-		// Poll every 1000ms
-		this.pollInterval = window.setInterval(() => {
+	private subscribeToUpdates(): void {
+		const progressListener: SyncStateListener = () => {
 			void this.updateDisplay();
-		}, 1000);
+		};
+
+		const startedListener: SyncStateListener = () => {
+			void this.updateDisplay();
+		};
+
+		const completedListener: SyncStateListener = (state) => {
+			this.handleCompletion(state);
+		};
+
+		const failedListener: SyncStateListener = (state) => {
+			this.handleCompletion(state);
+		};
+
+		this.unsubscribeProgress = this.syncStateStore.on(
+			"progress",
+			progressListener,
+		);
+		this.unsubscribeStarted = this.syncStateStore.on(
+			"started",
+			startedListener,
+		);
+		this.unsubscribeCompleted = this.syncStateStore.on(
+			"completed",
+			completedListener,
+		);
+		this.unsubscribeFailed = this.syncStateStore.on("failed", failedListener);
 	}
 
 	/**
-	 * Stop polling for sync state updates
+	 * Unsubscribe from state updates
 	 */
-	private stopPolling(): void {
-		if (this.pollInterval !== null) {
-			window.clearInterval(this.pollInterval);
-			this.pollInterval = null;
-		}
+	private unsubscribeFromUpdates(): void {
+		this.unsubscribeProgress?.();
+		this.unsubscribeStarted?.();
+		this.unsubscribeCompleted?.();
+		this.unsubscribeFailed?.();
+
+		this.unsubscribeProgress = null;
+		this.unsubscribeStarted = null;
+		this.unsubscribeCompleted = null;
+		this.unsubscribeFailed = null;
 	}
 
 	/**
@@ -122,28 +160,28 @@ export class SyncProgressModal extends Modal {
 				statsText = `${fetched} / ${total} repositories (${percentage}%)`;
 			}
 			this.statsEl?.setText(statsText);
-
-			// If not syncing, close modal after a brief delay
-			if (!state.isSyncing) {
-				this.stopPolling();
-
-				// Show completion message
-				if (state.error) {
-					this.statusEl?.setText("Sync failed!");
-					new Notice(`Sync failed: ${state.error}`);
-				} else {
-					this.statusEl?.setText("Sync completed!");
-					new Notice("Sync completed successfully!");
-				}
-
-				// Auto-close after 2 seconds
-				setTimeout(() => {
-					this.close();
-				}, 2000);
-			}
 		} catch (error) {
 			console.error("[SyncProgressModal] Error updating display:", error);
 		}
+	}
+
+	/**
+	 * Handle sync completion (success or failure)
+	 */
+	private handleCompletion(state: SyncState): void {
+		// Show completion message
+		if (state.error) {
+			this.statusEl?.setText("Sync failed!");
+			new Notice(`Sync failed: ${state.error}`);
+		} else {
+			this.statusEl?.setText("Sync completed!");
+			new Notice("Sync completed successfully!");
+		}
+
+		// Auto-close after 2 seconds
+		setTimeout(() => {
+			this.close();
+		}, 2000);
 	}
 }
 
@@ -151,12 +189,15 @@ export class SyncProgressModal extends Modal {
  * Simple sync progress notice
  *
  * Shows a lightweight progress indicator using Obsidian's Notice system
- * with periodic updates instead of a modal.
+ * with reactive updates instead of polling.
  */
 export class SyncProgressNotice {
 	private syncStateStore: SyncStateStore;
 	private notice: Notice | null = null;
-	private pollInterval: number | null = null;
+	private unsubscribeProgress: (() => void) | null = null;
+	private unsubscribeStarted: (() => void) | null = null;
+	private unsubscribeCompleted: (() => void) | null = null;
+	private unsubscribeFailed: (() => void) | null = null;
 
 	constructor(syncStateStore: SyncStateStore) {
 		this.syncStateStore = syncStateStore;
@@ -166,23 +207,68 @@ export class SyncProgressNotice {
 	 * Start showing progress notices
 	 */
 	start(): void {
+		// Subscribe to state changes
+		this.subscribeToUpdates();
+
 		// Initial notice
 		void this.updateNotice();
-
-		// Poll every 2 seconds (less frequent than modal to avoid spam)
-		this.pollInterval = window.setInterval(() => {
-			void this.updateNotice();
-		}, 2000);
 	}
 
 	/**
 	 * Stop showing progress notices
 	 */
 	stop(): void {
-		if (this.pollInterval !== null) {
-			window.clearInterval(this.pollInterval);
-			this.pollInterval = null;
-		}
+		this.unsubscribeFromUpdates();
+	}
+
+	/**
+	 * Subscribe to reactive state updates
+	 */
+	private subscribeToUpdates(): void {
+		const progressListener: SyncStateListener = () => {
+			void this.updateNotice();
+		};
+
+		const startedListener: SyncStateListener = () => {
+			void this.updateNotice();
+		};
+
+		const completedListener: SyncStateListener = (state) => {
+			this.handleCompletion(state);
+		};
+
+		const failedListener: SyncStateListener = (state) => {
+			this.handleCompletion(state);
+		};
+
+		this.unsubscribeProgress = this.syncStateStore.on(
+			"progress",
+			progressListener,
+		);
+		this.unsubscribeStarted = this.syncStateStore.on(
+			"started",
+			startedListener,
+		);
+		this.unsubscribeCompleted = this.syncStateStore.on(
+			"completed",
+			completedListener,
+		);
+		this.unsubscribeFailed = this.syncStateStore.on("failed", failedListener);
+	}
+
+	/**
+	 * Unsubscribe from state updates
+	 */
+	private unsubscribeFromUpdates(): void {
+		this.unsubscribeProgress?.();
+		this.unsubscribeStarted?.();
+		this.unsubscribeCompleted?.();
+		this.unsubscribeFailed?.();
+
+		this.unsubscribeProgress = null;
+		this.unsubscribeStarted = null;
+		this.unsubscribeCompleted = null;
+		this.unsubscribeFailed = null;
 	}
 
 	/**
@@ -204,12 +290,6 @@ export class SyncProgressNotice {
 					? "Resuming from checkpoint - "
 					: "Syncing: ";
 				message = `${statusPrefix}${state.currentStep} (${processed}/${total} - ${percentage}%)`;
-			} else if (state.error) {
-				message = `Sync failed: ${state.error}`;
-				this.stop();
-			} else if (state.lastSync) {
-				message = `Sync completed: ${processed} repositories`;
-				this.stop();
 			}
 
 			if (message) {
@@ -219,6 +299,27 @@ export class SyncProgressNotice {
 		} catch (error) {
 			console.error("[SyncProgressNotice] Error updating notice:", error);
 		}
+	}
+
+	/**
+	 * Handle sync completion (success or failure)
+	 */
+	private handleCompletion(state: SyncState): void {
+		const processed = state.repositoriesProcessed || 0;
+		let message = "";
+
+		if (state.error) {
+			message = `Sync failed: ${state.error}`;
+		} else if (state.lastSync) {
+			message = `Sync completed: ${processed} repositories`;
+		}
+
+		if (message) {
+			this.notice = new Notice(message, 5000);
+		}
+
+		// Stop listening after completion
+		this.stop();
 	}
 }
 

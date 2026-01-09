@@ -10,7 +10,7 @@ export const GITHUB_GRAPHQL_API_URL = 'https://api.github.com/graphql';
 export const GITHUB_REST_API_URL = 'https://api.github.com';
 
 /** Default number of repositories to fetch per page */
-export const DEFAULT_PAGE_SIZE = 100;
+export const DEFAULT_PAGE_SIZE = 10;
 
 /** Maximum number of repositories to fetch in one sync operation */
 export const MAX_REPOSITORIES_PER_SYNC = 1000;

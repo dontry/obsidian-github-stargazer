@@ -4,7 +4,10 @@
  * Type definitions for README fetching, storage, and conflict detection.
  */
 
-import { ReadmeFetchStatus, ReadmeConflictState } from '../config/readme-config.js';
+import type {
+	ReadmeConflictState,
+	ReadmeFetchStatus,
+} from "../config/readme-config.js";
 
 /**
  * README metadata stored in checkpoint for each repository
@@ -23,7 +26,7 @@ export interface ReadmeMetadata {
 
 	/**
 	 * Path to the README markdown file in the vault
-	 * Relative path from vault root (e.g., "facebook-react-README.md")
+	 * Relative path from vault root (e.g., "facebook/react/facebook-react-readme.md")
 	 */
 	vaultFilePath: string;
 
@@ -168,7 +171,7 @@ export interface ReadmeFetchResult {
 	/**
 	 * Skip reason (if skipped)
 	 */
-	skipReason?: 'sha_unchanged' | 'not_available' | 'too_large';
+	skipReason?: "sha_unchanged" | "not_available" | "too_large";
 }
 
 /**

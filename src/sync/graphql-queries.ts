@@ -12,51 +12,58 @@
  * The `after` cursor allows fetching subsequent pages of results.
  */
 export const GET_STARRED_REPOSITORIES_QUERY = `
-	query GetStarredRepositories($cursor: String, $pageSize: Int!) {
-		viewer {
-			starredRepositories(
-				first: $pageSize
-				after: $cursor
-				orderBy: {field: STARRED_AT, direction: DESC}
-			) {
-				pageInfo {
-					hasNextPage
-					endCursor
-				}
-				edges {
-					node {
-						... on Repository {
-							id
-							name
-							nameWithOwner
-							description
-							url
-							stargazerCount
-							primaryLanguage {
-								name
-							}
-							createdAt
-							updatedAt
-							pushedAt
-							owner {
-								login
-								url
-							}
-							readme: object(expression: "HEAD:README.md") {
-								... on Blob {
-									oid
+		query GetStarredRepositories($cursor: String, $pageSize: Int!) {
+				viewer {
+					starredRepositories(
+						first: $pageSize
+						after: $cursor
+						orderBy: {field: STARRED_AT, direction: DESC}
+					) {
+						pageInfo {
+							hasNextPage
+							endCursor
+						}
+						edges {
+							node {
+								... on Repository {
+									id
+									name
+									nameWithOwner
+									description
+									url
+									stargazerCount
+									primaryLanguage {
+										name
+									}
+									repositoryTopics(first: 10) {
+										nodes {
+											topic {
+												name
+											}
+										}
+									}
+									createdAt
+									updatedAt
+									pushedAt
+									owner {
+										login
+										url
+									}
+									readme: object(expression: "HEAD:README.md") {
+										... on Blob {
+											oid
+										}
+									}
+									defaultBranchRef {
+										name
+									}
 								}
 							}
-							defaultBranchRef {
-								name
-							}
+							starredAt
 						}
 					}
-					starredAt
 				}
 			}
-		}
-	}
 `;
 
 /**
@@ -150,6 +157,13 @@ export interface GetStarredRepositoriesResponse {
 					primaryLanguage: {
 						name: string;
 					} | null;
+					repositoryTopics: {
+						nodes: {
+							topic: {
+								name: string;
+							}
+						}[]
+					},
 					createdAt: string;
 					updatedAt: string;
 					pushedAt: string;
@@ -159,7 +173,6 @@ export interface GetStarredRepositoriesResponse {
 					};
 					readme: {
 						oid: string;
-						text: string;
 					} | null;
 					defaultBranchRef: {
 						name: string;

@@ -1,0 +1,37 @@
+meta {
+  name: New HTTP Request
+  type: http
+  seq: 1
+}
+
+post {
+  url: https://api.github.com/graphql
+  body: text
+  auth: none
+}
+
+headers {
+  Authorization: Bearer [github_access_token]
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "query": "query($owner:String!,$name:String!){repository(owner:$owner,name:$name){stargazerCount}}",
+    "variables": {
+      "owner": "octocat",
+      "name": "Hello-World"
+    }
+  }
+}
+
+body:text {
+  {
+    "query": "query GetStarredRepositories($cursor: String, $pageSize: Int!) { viewer { starredRepositories(first: $pageSize, after: $cursor, orderBy: {field: STARRED_AT, direction: DESC}) { pageInfo { hasNextPage endCursor } edges { node { ... on Repository { id name nameWithOwner description url stargazerCount primaryLanguage { name } repositoryTopics(first: 20) { nodes { topic { name } } } createdAt updatedAt pushedAt owner { login url } readme: object(expression: \"HEAD:README.md\") { ... on Blob { text oid } } defaultBranchRef { name } } } starredAt } } } }",
+    "variables": {
+      "cursor": null,
+      "pageSize": 50
+    }
+  }
+  
+}

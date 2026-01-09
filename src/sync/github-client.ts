@@ -2,12 +2,12 @@ import { type RequestUrlResponse, requestUrl } from "obsidian";
 import {
 	GITHUB_README_API_URL,
 	README_FETCH_TIMEOUT,
-	README_MAX_FILE_SIZE,
 } from "@/config/readme-config";
-import type {
-	GetStarredRepositoriesResponse,
-	GitHubGraphQLResult,
-	UnstarRepositoryResponse,
+import {
+	GET_STARRED_REPOSITORIES_QUERY,
+	type GetStarredRepositoriesResponse,
+	type GitHubGraphQLResult,
+	type UnstarRepositoryResponse,
 } from "@/sync/graphql-queries";
 import {
 	AccessDeniedError,
@@ -182,54 +182,6 @@ export class GitHubGraphQLClient {
 		pageSize: number,
 	): Promise<GitHubGraphQLResult<GetStarredRepositoriesResponse>> {
 		return this.fetchWithRetry(async () => {
-			const query = `
-				query GetStarredRepositories($cursor: String, $pageSize: Int!) {
-					viewer {
-						starredRepositories(
-							first: $pageSize
-							after: $cursor
-							orderBy: {field: STARRED_AT, direction: DESC}
-						) {
-							pageInfo {
-								hasNextPage
-								endCursor
-							}
-							edges {
-								node {
-									... on Repository {
-										id
-										name
-										nameWithOwner
-										description
-										url
-										stargazerCount
-										primaryLanguage {
-											name
-										}
-										createdAt
-										updatedAt
-										pushedAt
-										owner {
-											login
-											url
-										}
-										readme: object(expression: "HEAD:README.md") {
-											... on Blob {
-												text
-											}
-										}
-										defaultBranchRef {
-											name
-										}
-									}
-								}
-								starredAt
-							}
-						}
-					}
-				}
-			`;
-
 			const response = await requestUrl({
 				url: GITHUB_GRAPHQL_API_URL,
 				method: "POST",
@@ -238,7 +190,7 @@ export class GitHubGraphQLClient {
 					"Content-Type": "application/json",
 				},
 				body: JSON.stringify({
-					query,
+					query: GET_STARRED_REPOSITORIES_QUERY,
 					variables: { cursor, pageSize },
 				}),
 			});

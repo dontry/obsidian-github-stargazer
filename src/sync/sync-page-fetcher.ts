@@ -140,7 +140,7 @@ export class SyncPageFetcher {
 				updatedAt: node.updatedAt,
 				starredAt: edge.starredAt,
 				readmeSha: node.readme?.oid ?? null,
-				tags: [],
+				topics: node.repositoryTopics.nodes.map((topicNode) => topicNode.topic.name),
 				linkedResources: [],
 			};
 		});

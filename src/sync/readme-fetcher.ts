@@ -17,17 +17,14 @@ import {
 	ReadmeFetchStatus,
 } from "@/config/readme-config";
 import type { VaultFileManager } from "@/storage/vault-file-manager";
-import {
-	ReadmeNotFoundError,
-	ReadmeTooLargeError,
-} from "@/types/errors";
+import { ReadmeNotFoundError, ReadmeTooLargeError } from "@/types/errors";
 import type {
 	ReadmeConflictDetection,
 	ReadmeFetchResult,
 	ReadmeMetadata,
 } from "@/types/readme";
+import { generateReadmeFilePath } from "@/utils/path-utils";
 import { hasReadmeChanged } from "@/utils/sha";
-import { generateReadmeFilePath } from "@/utils/validation";
 import type { GitHubGraphQLClient } from "./github-client";
 
 /**
@@ -77,8 +74,7 @@ export class ReadmeFetcher {
 	}
 
 	/** Maximum number of concurrent README fetch requests */
-	private static readonly MAX_CONCURRENT_REQUESTS =
-		README_CONCURRENCY_LIMIT;
+	private static readonly MAX_CONCURRENT_REQUESTS = README_CONCURRENCY_LIMIT;
 
 	/** Currently active fetch count */
 	private activeFetchCount = 0;
@@ -103,7 +99,6 @@ export class ReadmeFetcher {
 	): Promise<ReadmeFetchResult> {
 		if (!owner || !repo) {
 			throw new Error("owner or repoName is undefined");
-
 		}
 		// Use concurrency pool to limit parallel requests
 		return this.createRequestPool(owner, repo, options);
@@ -448,7 +443,8 @@ export class ReadmeFetcher {
 		const isRateLimitError =
 			error instanceof Error && error.message.includes("rate limit");
 
-		const errorMessage = error instanceof Error ? error.message : "Unknown error";
+		const errorMessage =
+			error instanceof Error ? error.message : "Unknown error";
 
 		const metadata: ReadmeMetadata = {
 			sha: "",
@@ -602,7 +598,7 @@ export class ReadmeFetcher {
 			await this.executeFetch(request).finally(() => {
 				this.activeFetchCount--;
 				// Process next item in queue
-				this.processQueue().catch(console.error)
+				this.processQueue().catch(console.error);
 			});
 		}
 	}

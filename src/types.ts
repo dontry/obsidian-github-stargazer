@@ -29,18 +29,24 @@ export interface Repository {
 	updatedAt: string;
 	/** When user starred this repo (ISO8601) */
 	starredAt: string;
-	/** Array of tag names applied to this repo */
-	tags: string[];
+	/** Array of topics names applied to this repo */
+	topics: string[];
 	/** External documentation links */
 	linkedResources: LinkedResource[];
 	/** Whether the repo has been un-starred but kept locally */
 	isUnstarred?: boolean;
 	/** SHA hash of the README content from GitHub API (for change detection) */
 	readmeSha: string | null;
-	/** Path to the README markdown file in the vault root (e.g., "facebook-react-README.md") */
+	/** Path to the README markdown file in the vault (e.g., "facebook/react/facebook-react-readme.md") */
 	readmeVaultFilePath?: string; 
 	/** Whether the user has manually edited the README file in the vault */
 	localReadmeModified?: boolean;
+	/** Path to metadata file in new structure (e.g., "facebook/react/facebook-react-metadata.md") @feature 006-repo-metadata-frontmatter */
+	metadataFilePath?: string;
+	/** SHA-256 hash of last metadata write (for change detection) @feature 006-repo-metadata-frontmatter */
+	metadataSha?: string;
+	/** Whether the user has added notes to the metadata file @feature 006-repo-metadata-frontmatter */
+	hasUserNotes?: boolean;
 }
 
 /**
@@ -263,4 +269,112 @@ export class CheckpointValidationError extends Error {
 		super(message);
 		this.name = 'CheckpointValidationError';
 	}
+}
+
+/**
+ * Repository metadata extracted from GitHub API for YAML frontmatter
+ * @feature 006-repo-metadata-frontmatter
+ */
+export interface RepositoryMetadata {
+	/** Repository name (e.g., "react") */
+	name: string;
+	/** Full name with owner (e.g., "facebook/react") */
+	fullName: string;
+	/** Repository description or null if not provided */
+	description: string | null;
+	/** Total number of stars */
+	starCount: number;
+	/** Primary programming language or null if not detected */
+	primaryLanguage: string | null;
+	/** Array of topic names */
+	tags: string[];
+	/** GitHub repository URL */
+	url: string;
+	/** Repository owner login (username) */
+	ownerLogin: string;
+	/** Repository creation timestamp (ISO8601) */
+	createdAt: string;
+	/** Last update timestamp (ISO8601) */
+	updatedAt: string;
+	/** Custom homepage URL or null if not set */
+	homepageUrl: string | null;
+	/** License SPDX identifier (e.g., "MIT", "Apache-2.0") or null */
+	license: string | null;
+	/** Total number of forks */
+	forkCount: number;
+	/** Total number of open issues */
+	openIssuesCount: number;
+	/** Total number of watchers */
+	watchersCount: number;
+}
+
+/**
+ * Result of a file system operation on vault files
+ * @feature 006-repo-metadata-frontmatter
+ */
+export interface FileOperationResult {
+	/** Whether the operation completed successfully */
+	success: boolean;
+	/** Relative path of the file in the vault */
+	filePath: string;
+	/** Action that was performed or attempted */
+	action: 'created' | 'updated' | 'deleted' | 'skipped';
+	/** Error if operation failed, null otherwise */
+	error: Error | null;
+	/** Human-readable message for logging/UI (optional) */
+	message?: string;
+}
+
+/**
+ * A metadata markdown file stored in the vault
+ * @feature 006-repo-metadata-frontmatter
+ */
+export interface RepositoryMetadataFile {
+	/** Relative path from vault root (e.g., "facebook/react/facebook-react-metadata.md") */
+	filePath: string;
+	/** Repository metadata from GitHub API */
+	metadata: RepositoryMetadata;
+	/** YAML frontmatter block as string (including --- markers) */
+	frontmatter: string;
+	/** User-written content below frontmatter (preserved during updates) */
+	userContent: string;
+	/** SHA-256 hash of metadata (for change detection) */
+	metadataSha: string;
+	/** Whether user has manually edited this file */
+	hasUserEdits: boolean;
+	/** Last sync timestamp (ISO8601) */
+	lastSyncedAt: string;
+}
+
+/**
+ * Options for metadata file generation during sync
+ * @feature 006-repo-metadata-frontmatter
+ */
+export interface MetadataSyncOptions {
+	/** Force refresh all metadata files (ignore SHA check) */
+	forceRefresh?: boolean;
+	/** Whether to create metadata files (true by default) */
+	createMetadata?: boolean;
+	/** Whether to update existing metadata files (true by default) */
+	updateMetadata?: boolean;
+	/** Callback for progress updates during sync */
+	onProgress?: (repo: Repository, result: FileOperationResult) => void;
+	/** Callback for user confirmation (unstar deletion) */
+	onConfirm?: (repos: Repository[]) => Promise<boolean>;
+}
+
+/**
+ * Generate SHA-256 hash of repository metadata for change detection
+ * @feature 006-repo-metadata-frontmatter
+ * @param metadata - Repository metadata object
+ * @returns SHA-256 hash as hexadecimal string
+ */
+export async function generateMetadataSha(metadata: RepositoryMetadata): Promise<string> {
+	// Sort keys for consistent hashing regardless of field order
+	const metadataJson = JSON.stringify(metadata, Object.keys(metadata).sort());
+	const encoder = new TextEncoder();
+	const data = encoder.encode(metadataJson);
+	const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+	const hashArray = Array.from(new Uint8Array(hashBuffer));
+	return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }

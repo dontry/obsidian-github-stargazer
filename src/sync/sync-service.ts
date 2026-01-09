@@ -4,6 +4,7 @@ import type { RepositoryStore } from "@/storage/repository-store";
 import type { SyncStateStore } from "@/storage/sync-state-store";
 import { VaultFileManager } from "@/storage/vault-file-manager";
 import { GitHubGraphQLClient } from "@/sync/github-client";
+import { MetadataGenerator } from "@/sync/metadata-generator";
 import { RateLimiter } from "@/sync/rate-limiter";
 import { ReadmeFetcher } from "@/sync/readme-fetcher";
 import { SyncChangeDetector } from "@/sync/sync-change-detector";
@@ -13,6 +14,10 @@ import { SyncResumeHandler } from "@/sync/sync-resume";
 import type { Repository, SyncCheckpoint } from "@/types";
 import { ERROR_MESSAGES } from "@/utils/constants";
 import { checkDiskSpace } from "@/utils/disk-check";
+import {
+	createOrUpdateMetadataFile,
+	ensureOwnerDirectoryExists,
+} from "@/utils/file-manager";
 import { error, info, warn } from "@/utils/logger";
 
 /**
@@ -32,6 +37,7 @@ export class SyncService {
 	private changeDetector: SyncChangeDetector;
 	private readmeFetcher: ReadmeFetcher;
 	private vaultManager: VaultFileManager;
+	private metadataGenerator: MetadataGenerator;
 	private app: App;
 
 	constructor(
@@ -58,6 +64,7 @@ export class SyncService {
 			this.vaultManager,
 			new Map(),
 		);
+		this.metadataGenerator = new MetadataGenerator();
 		this.resumeHandler = new SyncResumeHandler(
 			app,
 			this.githubClient,
@@ -121,10 +128,13 @@ export class SyncService {
 				async (pageRepos, cursor) => {
 					// Convert repositories to final storage incrementally
 					await this.checkpointHandler.convertIncremental(pageRepos);
+					if(!currentCheckpoint) {
+						throw new Error("Current checkpoint is null");
+					}
 
 					// Update checkpoint after each page
 					return await this.checkpointHandler.updateCheckpoint(
-						currentCheckpoint!,
+						currentCheckpoint,
 						pageRepos,
 						cursor,
 					);
@@ -208,6 +218,12 @@ export class SyncService {
 				await this.checkpointHandler.syncCheckpoint(currentCheckpoint);
 			}
 
+			// Generate metadata files for all repositories
+			info("Generating metadata files for repositories", {
+				count: repositories.length,
+			});
+			await this.generateMetadataForRepositories(repositories);
+
 			// Delete checkpoint on sync completion
 			await this.checkpointHandler.deleteCheckpoint();
 			info("Checkpoint deleted - sync complete");
@@ -272,6 +288,15 @@ export class SyncService {
 				await this.repositoryStore.markAsUnstarred(removedId);
 			}
 
+			// Generate metadata files for new and updated repositories
+			const reposToUpdate = [...changes.added, ...changes.updated];
+			if (reposToUpdate.length > 0) {
+				info("Generating metadata files for changed repositories", {
+					count: reposToUpdate.length,
+				});
+				await this.generateMetadataForRepositories(reposToUpdate);
+			}
+
 			const message = `Incremental sync: +${changes.added.length} ~${changes.updated.length} -${changes.removed.length}`;
 			new Notice(message);
 
@@ -325,6 +350,111 @@ export class SyncService {
 		} catch (err) {
 			error("Failed to start fresh sync", err);
 			throw err;
+		}
+	}
+
+	/**
+	 * Generate metadata files for all repositories
+	 * @feature 006-repo-metadata-frontmatter
+	 *
+	 * Creates or updates metadata files for each repository with YAML frontmatter.
+	 * Metadata files are created in the structure: owner/repo/owner-repo-metadata.md
+	 * Errors are handled gracefully - sync continues even if individual metadata files fail.
+	 *
+	 * @param repositories - List of repositories to generate metadata for
+	 */
+	private async generateMetadataForRepositories(
+		repositories: Repository[],
+	): Promise<void> {
+		let createdCount = 0;
+		let updatedCount = 0;
+		let skippedCount = 0;
+		let failedCount = 0;
+
+		for (const repo of repositories) {
+			const [owner, repoName] = repo.nameWithOwner.split("/");
+
+			if (!owner || !repoName) {
+				warn("Invalid repository name format", {
+					nameWithOwner: repo.nameWithOwner,
+				});
+				continue;
+			}
+
+			try {
+				// Ensure owner directory exists
+				await ensureOwnerDirectoryExists(this.app, repo.nameWithOwner);
+
+				// Generate frontmatter
+				const frontmatter = this.metadataGenerator.generateFrontmatter(repo);
+
+				// Generate file path
+				const filePath = this.metadataGenerator.generateMetadataFilePath(
+					owner,
+					repoName,
+				);
+
+				// Create or update metadata file
+				const result = await createOrUpdateMetadataFile(
+					this.app,
+					filePath,
+					frontmatter,
+				);
+
+				// Track statistics
+				if (result.success) {
+					if (result.action === "created") {
+						createdCount++;
+						info("Metadata file created", {
+							repository: repo.nameWithOwner,
+							filePath,
+						});
+					} else if (result.action === "updated") {
+						updatedCount++;
+						info("Metadata file updated", {
+							repository: repo.nameWithOwner,
+							filePath,
+						});
+					} else if (result.action === "skipped") {
+						skippedCount++;
+						info("Metadata file unchanged, skipping update", {
+							repository: repo.nameWithOwner,
+							filePath,
+						});
+					}
+				} else {
+					failedCount++;
+					warn("Failed to create/update metadata file", {
+						repository: repo.nameWithOwner,
+						filePath,
+						error: result.error?.message,
+					});
+				}
+			} catch (err) {
+				// Individual metadata file errors should not fail the entire sync
+				warn("Failed to generate metadata for repository", {
+					repository: repo.nameWithOwner,
+					error: err instanceof Error ? err.message : "Unknown error",
+				});
+				failedCount++;
+			}
+		}
+
+		// Log summary statistics
+		info("Metadata file generation completed", {
+			total: repositories.length,
+			created: createdCount,
+			updated: updatedCount,
+			skipped: skippedCount,
+			failed: failedCount,
+		});
+
+		// Show notice to user
+		const noticeMessage = `Metadata: ${createdCount} created, ${updatedCount} updated, ${skippedCount} unchanged`;
+		if (failedCount > 0) {
+			new Notice(`${noticeMessage}, ${failedCount} failed`);
+		} else {
+			new Notice(noticeMessage);
 		}
 	}
 

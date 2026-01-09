@@ -2,23 +2,24 @@
  * Vault File Manager for README Storage
  *
  * Handles all vault file operations for README files:
- * - Create/update README markdown files in vault root
+ * - Create/update README markdown files under owner/repo folders
  * - Check for file collisions before writing
  * - Detect local user modifications
  * - Read file metadata and content
  *
- * Files are stored in vault root with format: {owner}-{repo}-README.md
+ * Files are stored under owner/repo with format: {owner}/{repo}/{owner}-{repo}-readme.md
  */
 
 import { type App, normalizePath } from "obsidian";
 import { ReadmeConflictState } from "@/config/readme-config";
 import type { ReadmeConflictDetection } from "@/types/readme";
+import { ensureOwnerDirectoryExists } from "@/utils/file-manager";
 
 /**
  * Vault File Manager
  *
  * Provides methods for README file operations in the Obsidian vault.
- * All files are stored in the vault root directory.
+ * All files are stored under owner/repo directories.
  */
 export class VaultFileManager {
 	private app: App;
@@ -35,7 +36,7 @@ export class VaultFileManager {
 	 * 2. If file exists and localModified=false: Update content
 	 * 3. If file doesn't exist: Create new file
 	 *
-	 * @param filePath - Path to the README file (e.g., "owner-repo-README.md")
+	 * @param filePath - Path to the README file (e.g., "owner/repo/owner-repo-readme.md")
 	 * @param content - Markdown content to write
 	 * @param localModified - Whether user has edited the file locally
 	 * @returns True if file was created/updated, false if skipped due to local modification
@@ -46,6 +47,15 @@ export class VaultFileManager {
 		localModified: boolean,
 	): Promise<boolean> {
 		const normalizedPath = normalizePath(filePath);
+
+		// Ensure owner/repo directories exist before writing
+		const pathParts = normalizedPath.split("/");
+		if (pathParts.length > 2) {
+			await ensureOwnerDirectoryExists(
+				this.app,
+				`${pathParts[0]}/${pathParts[1]}`,
+			);
+		}
 
 		// Check if file exists
 		const fileExists = await this.app.vault.adapter.exists(normalizedPath);
@@ -99,8 +109,8 @@ export class VaultFileManager {
 	 * Check for file collisions (name conflicts) in the vault
 	 *
 	 * Two repositories might have the same sanitized filename:
-	 * - "foo/bar" → "foo-bar-README.md"
-	 * - "foo-bar" → "foo-bar-README.md"
+	 * - "foo/bar" → "foo/bar/foo-bar-readme.md"
+	 * - "foo-bar" → "foo-bar/foo-bar/foo-bar-readme.md"
 	 *
 	 * This method detects such collisions and returns collision info.
 	 *

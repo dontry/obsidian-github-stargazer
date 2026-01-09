@@ -4,7 +4,7 @@
 	"version": "1.0.0",
 	"minAppVersion": "1.0.0",
 	"description": "Sync and manage your GitHub starred repositories in Obsidian with notes, tags, and custom organization",
-	"author": "Your Name",
+	"author": "dontry",
 	"authorUrl": "https://github.com/dontry",
 	"isDesktopOnly": false
 }

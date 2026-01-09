@@ -138,7 +138,7 @@ export function validateFilePathSafe(filePath: string): boolean {
 	}
 
 	// Check for absolute path patterns (Unix: /path, Windows: C:/path, C:\path)
-	if (filePath.match(/^\/|^[a-zA-Z]:[\/\\]/)) {
+	if (filePath.match(/^\/|^[a-zA-Z]:[/\\]/)) {
 		throw new Error(`Absolute paths not allowed: ${filePath}`);
 	}
 

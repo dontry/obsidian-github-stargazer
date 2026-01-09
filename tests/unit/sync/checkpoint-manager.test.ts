@@ -59,7 +59,7 @@ describe("CheckpointManager", () => {
 						createdAt: "2025-01-02T00:00:00Z",
 						updatedAt: "2025-01-02T00:00:00Z",
 						readmeSha: "a123sad",
-						tags: [],
+						topics: [],
 						linkedResources: [],
 						isUnstarred: false,
 					},

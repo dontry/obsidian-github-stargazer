@@ -2,11 +2,11 @@
   "hooks": {
     "Stop": [
       {
-        "matcher": ".*",
+        "matcher": "*/speckit.implement*",
         "hooks": [
           {
             "type": "command",
-            "command": "pnpm lint"
+            "command": "echo '🚀 Implementation complete. Use the spec-auditor subagent to verify against the spec.'"
           }
         ]
       }

@@ -105,6 +105,8 @@ export interface PluginSettings {
 	lastSyncAt: string | null;
 	/** Max repositories to cache in memory */
 	maxRepositoryCacheSize: number;
+	/** Number of repositories to fetch per page (default: 10) */
+	pageSize?: number;
 }
 
 /**

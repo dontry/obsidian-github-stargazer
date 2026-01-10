@@ -42,6 +42,8 @@ export class SyncChangeDetector {
 		for (const id of existingIds) {
 			if (!currentIds.has(id)) {
 				removed.push(id);
+			}  else if (existing.get(id)?.isUnstarred) {
+				removed.push(id);
 			}
 		}
 

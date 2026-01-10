@@ -1,6 +1,7 @@
-import { type App, PluginSettingTab, Setting, Notice } from "obsidian";
+import { type App, Notice, PluginSettingTab, Setting } from "obsidian";
 import type GitHubStargazerPlugin from "@/main";
 import { CheckpointManager } from "@/sync/checkpoint-manager";
+import { DEFAULT_PAGE_SIZE } from "@/utils/constants";
 
 /**
  * Settings tab for GitHub Stargazer plugin
@@ -19,9 +20,7 @@ export class GitHubStargazerSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 
 		containerEl.empty();
-
 		// Header
-		;
 
 		// Description
 		containerEl.createEl("p", {
@@ -70,7 +69,7 @@ export class GitHubStargazerSettingTab extends PluginSettingTab {
 							: "60",
 					)
 					.onChange(async (value) => {
-						const num = Number.parseInt(value,10);
+						const num = Number.parseInt(value, 10);
 						if (!Number.isNaN(num) && num > 0) {
 							this.plugin.settings.autoSyncIntervalMinutes = num;
 							await this.plugin.saveSettings();
@@ -101,6 +100,31 @@ export class GitHubStargazerSettingTab extends PluginSettingTab {
 					}),
 			);
 
+		// Page Size Setting
+		new Setting(containerEl)
+			.setName("Repositories Per Page")
+			.setDesc(
+				"Number of repositories to fetch per request (1-100). Higher values may be faster but use more rate limit points.",
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("10")
+					.setValue(
+						this.plugin.settings.pageSize
+							? String(this.plugin.settings.pageSize)
+							: `${DEFAULT_PAGE_SIZE}`,
+					)
+					.onChange(async (value) => {
+						const num = Number.parseInt(value, 10);
+						if (!Number.isNaN(num) && num >= 1 && num <= 100) {
+							this.plugin.settings.pageSize = num;
+							await this.plugin.saveSettings();
+						} else {
+							new Notice("Page size must be between 1 and 100.");
+						}
+					}),
+			);
+
 		// Sync Status Section
 		new Setting(containerEl).setName("Sync Status").setHeading();
 
@@ -114,7 +138,9 @@ export class GitHubStargazerSettingTab extends PluginSettingTab {
 			.addButton((button) =>
 				button.setButtonText("Refresh").onClick(async () => {
 					// Update sync status display
-					const syncState = await this.plugin.getSyncStateStore().loadSyncState();
+					const syncState = await this.plugin
+						.getSyncStateStore()
+						.loadSyncState();
 					syncInfo.empty();
 					syncInfo.createEl("p", {
 						text: `Last sync: ${
@@ -175,7 +201,8 @@ export class GitHubStargazerSettingTab extends PluginSettingTab {
 				}
 			} catch (error) {
 				checkpointInfo.empty();
-				const errorMessage = error instanceof Error ? error.message : "Unknown error";
+				const errorMessage =
+					error instanceof Error ? error.message : "Unknown error";
 				checkpointInfo.createEl("p", {
 					text: `Error loading checkpoint: ${errorMessage}`,
 					cls: "checkpoint-error",
@@ -273,12 +300,15 @@ export class GitHubStargazerSettingTab extends PluginSettingTab {
 			await checkpointManager.deleteCheckpoint();
 
 			// Show confirmation notice
-			new Notice("✓ Checkpoint deleted successfully. Next sync will start fresh.");
+			new Notice(
+				"✓ Checkpoint deleted successfully. Next sync will start fresh.",
+			);
 
 			// Refresh display
 			await refreshCallback();
 		} catch (error) {
-			const errorMessage = error instanceof Error ? error.message : "Unknown error";
+			const errorMessage =
+				error instanceof Error ? error.message : "Unknown error";
 			new Notice(`Failed to reset checkpoint: ${errorMessage}`);
 			console.error("[SettingsTab] Failed to reset checkpoint:", error);
 		}

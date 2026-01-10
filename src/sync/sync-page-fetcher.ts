@@ -4,7 +4,6 @@ import type { GitHubGraphQLClient } from "@/sync/github-client";
 import type { GetStarredRepositoriesResponse } from "@/sync/graphql-queries";
 import type { RateLimiter } from "@/sync/rate-limiter";
 import type { Repository, SyncCheckpoint } from "@/types";
-import { DEFAULT_PAGE_SIZE } from "@/utils/constants";
 import { info } from "@/utils/logger";
 
 /**
@@ -17,15 +16,18 @@ export class SyncPageFetcher {
 	private githubClient: GitHubGraphQLClient;
 	private rateLimiter: RateLimiter;
 	private syncStateStore: SyncStateStore;
+	private pageSize: number;
 
 	constructor(
 		githubClient: GitHubGraphQLClient,
 		rateLimiter: RateLimiter,
 		syncStateStore: SyncStateStore,
+		pageSize?: number,
 	) {
 		this.githubClient = githubClient;
 		this.rateLimiter = rateLimiter;
 		this.syncStateStore = syncStateStore;
+		this.pageSize = pageSize ?? 10;
 	}
 
 	/**
@@ -63,7 +65,7 @@ export class SyncPageFetcher {
 			// Fetch page
 			const response = await this.githubClient.fetchStarredRepositories(
 				cursor,
-				DEFAULT_PAGE_SIZE,
+				this.pageSize,
 			);
 
 			// Update rate limit info from response extensions

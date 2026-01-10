@@ -25,6 +25,7 @@ describe("SettingsStore", () => {
 				autoSyncIntervalMinutes: 30,
 				lastSyncAt: "2025-12-30T12:00:00Z",
 				maxRepositoryCacheSize: 500,
+				pageSize: 10,
 			};
 
 			vi.mocked(mockApp.loadData).mockResolvedValue(mockData);

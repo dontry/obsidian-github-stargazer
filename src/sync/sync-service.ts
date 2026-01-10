@@ -16,6 +16,7 @@ import { ERROR_MESSAGES } from "@/utils/constants";
 import { checkDiskSpace } from "@/utils/disk-check";
 import {
 	createOrUpdateMetadataFile,
+	deleteRepositoryFiles,
 	ensureOwnerDirectoryExists,
 } from "@/utils/file-manager";
 import { error, info, warn } from "@/utils/logger";
@@ -45,6 +46,7 @@ export class SyncService {
 		githubToken: string,
 		repositoryStore: RepositoryStore,
 		syncStateStore: SyncStateStore,
+		pageSize?: number,
 	) {
 		this.app = app;
 		this.githubClient = new GitHubGraphQLClient(githubToken);
@@ -56,6 +58,7 @@ export class SyncService {
 			this.githubClient,
 			this.rateLimiter,
 			syncStateStore,
+			pageSize,
 		);
 		this.changeDetector = new SyncChangeDetector();
 		this.vaultManager = new VaultFileManager(app);
@@ -71,6 +74,7 @@ export class SyncService {
 			this.rateLimiter,
 			this.checkpointHandler,
 			syncStateStore,
+			pageSize,
 		);
 	}
 
@@ -283,9 +287,18 @@ export class SyncService {
 				...changes.updated,
 			]);
 
-			// Mark removed repositories as unstarred
+			// Delete vault files for removed repositories and mark as unstarred
 			for (const removedId of changes.removed) {
-				await this.repositoryStore.markAsUnstarred(removedId);
+				const removedRepo = existingRepos.get(removedId);
+				if (removedRepo) {
+					// Delete the actual markdown files from the vault
+					const deleteResults = await deleteRepositoryFiles(this.app, removedRepo);
+					info(`Deleted vault files for unstarred repository: ${removedRepo.nameWithOwner}`, {
+						results: deleteResults,
+					});
+					// Mark as unstarred in the store
+					await this.repositoryStore.markAsUnstarred(removedId);
+				}
 			}
 
 			// Generate metadata files for new and updated repositories

@@ -22,6 +22,7 @@ export class SyncResumeHandler {
 	private checkpointHandler: SyncCheckpointHandler;
 	private syncStateStore: SyncStateStore;
 	private app: App;
+	private pageSize: number;
 
 	constructor(
 		app: App,
@@ -29,12 +30,14 @@ export class SyncResumeHandler {
 		rateLimiter: RateLimiter,
 		checkpointHandler: SyncCheckpointHandler,
 		syncStateStore: SyncStateStore,
+		pageSize?: number,
 	) {
 		this.app = app;
 		this.githubClient = githubClient;
 		this.rateLimiter = rateLimiter;
 		this.checkpointHandler = checkpointHandler;
 		this.syncStateStore = syncStateStore;
+		this.pageSize = pageSize ?? DEFAULT_PAGE_SIZE;
 	}
 
 	/**
@@ -71,7 +74,7 @@ export class SyncResumeHandler {
 	async performResumeSync(checkpoint: SyncCheckpoint): Promise<Repository[]> {
 		const repositories: Repository[] = [];
 		let cursor = checkpoint.cursor;
-		let pageCount = Math.floor(checkpoint.fetchedCount / DEFAULT_PAGE_SIZE);
+		let pageCount = Math.floor(checkpoint.fetchedCount / this.pageSize);
 
 		try {
 			await this.syncStateStore.markSyncStarted();
@@ -95,7 +98,7 @@ export class SyncResumeHandler {
 					// Fetch page
 					const response = await this.githubClient.fetchStarredRepositories(
 						cursor,
-						DEFAULT_PAGE_SIZE,
+						this.pageSize,
 					);
 
 					// Update rate limit info from response extensions

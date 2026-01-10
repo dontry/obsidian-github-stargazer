@@ -9,13 +9,14 @@ const isTestEnvironment = () =>
 /**
  * Default plugin settings
  */
-const DEFAULT_SETTINGS: PluginSettings = {
+export const DEFAULT_SETTINGS: PluginSettings = {
 	githubToken: "",
 	autoSyncEnabled: false,
 	autoSyncIntervalMinutes: 60,
 	lastSyncAt: null,
 	maxRepositoryCacheSize: 1000,
-};
+	pageSize: 10,
+};;
 
 /**
  * Settings store for managing plugin settings

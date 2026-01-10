@@ -123,6 +123,7 @@ export default class GitHubStargazerPlugin extends Plugin {
 					this.settings.githubToken,
 					this.repositoryStore,
 					this.syncStateStore,
+					this.settings.pageSize,
 				);
 			} else {
 				await this.syncCommand.execute(
@@ -131,6 +132,7 @@ export default class GitHubStargazerPlugin extends Plugin {
 					this.repositoryStore,
 					this.syncStateStore,
 					mode,
+					this.settings.pageSize,
 				);
 			}
 		} catch (error) {

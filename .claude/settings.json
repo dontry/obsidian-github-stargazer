@@ -2,7 +2,7 @@
   "hooks": {
     "Stop": [
       {
-        "matcher": "*/speckit.implement*",
+        "matcher": "*/{speckit.implement,sc.task}*",
         "hooks": [
           {
             "type": "command",

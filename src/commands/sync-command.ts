@@ -24,6 +24,7 @@ export class SyncCommand {
 		repositoryStore: RepositoryStore,
 		syncStateStore: SyncStateStore,
 		mode: "initial" | "incremental" = "incremental",
+		pageSize?: number,
 	): Promise<void> {
 		// Validate GitHub token
 		if (!githubToken || githubToken.trim() === "") {
@@ -38,6 +39,7 @@ export class SyncCommand {
 				githubToken,
 				repositoryStore,
 				syncStateStore,
+				pageSize,
 			);
 
 			// Check if this is an initial or incremental sync
@@ -108,6 +110,7 @@ export class SyncCommand {
 		githubToken: string,
 		repositoryStore: RepositoryStore,
 		syncStateStore: SyncStateStore,
+		pageSize?: number,
 	): Promise<void> {
 		// Validate GitHub token
 		if (!githubToken || githubToken.trim() === "") {
@@ -133,6 +136,7 @@ export class SyncCommand {
 				githubToken,
 				repositoryStore,
 				syncStateStore,
+				pageSize,
 			);
 
 			// Show progress indicator only in environments with window
@@ -184,6 +188,7 @@ export function registerSyncCommand(
 				repositoryStore,
 				syncStateStore,
 				"incremental",
+				settings.pageSize,
 			);
 		},
 	});
@@ -200,6 +205,7 @@ export function registerSyncCommand(
 				repositoryStore,
 				syncStateStore,
 				"initial",
+				settings.pageSize,
 			);
 		},
 	});

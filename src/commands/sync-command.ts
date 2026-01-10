@@ -4,7 +4,9 @@ import type { RepositoryStore } from "@/storage/repository-store";
 import type { SyncStateStore } from "@/storage/sync-state-store";
 import { CheckpointManager } from "@/sync/checkpoint-manager";
 import { SyncService } from "@/sync/sync-service";
+import { RepositoryDeletionModal } from "@/ui/repository-deletion-modal";
 import { ERROR_MESSAGES } from "@/utils/constants";
+import { info } from "@/utils/logger";
 
 /**
  * Sync command handler
@@ -58,7 +60,20 @@ export class SyncCommand {
 			} else {
 				// Incremental sync
 				new Notice("Starting incremental sync...");
-				await this.syncService.performIncrementalSync();
+				const result =
+					await this.syncService.performIncrementalSync();
+
+				// Show deletion prompt if there are unstarred repositories
+				if (result.removed.length > 0) {
+					info(
+						`Found ${result.removed.length} unstarred repository/repositories`,
+					);
+					new RepositoryDeletionModal(
+						app,
+						result.removed,
+						repositoryStore,
+					).open();
+				}
 			}
 
 			new Notice("Sync completed successfully!");

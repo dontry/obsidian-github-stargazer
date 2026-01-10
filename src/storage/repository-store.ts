@@ -127,6 +127,17 @@ export class RepositoryStore {
 	}
 
 	/**
+	 * Delete repositories by their IDs (complete removal from store)
+	 */
+	async deleteRepositories(repositoryIds: string[]): Promise<void> {
+		const data = await this.loadRepositories();
+		data.repositories = data.repositories.filter(
+			(repo) => !repositoryIds.includes(repo.id),
+		);
+		await this.saveRepositories(data);
+	}
+
+	/**
 	 * Clear the internal cache
 	 */
 	clearCache(): void {

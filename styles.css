@@ -42,3 +42,51 @@ If your plugin does not need CSS, delete this file.
 	text-align: center;
 	margin: 0;
 }
+
+/* Repository Deletion Modal Styles */
+.repo-deletion-buttons {
+	display: flex;
+	gap: 10px;
+	margin-bottom: 15px;
+}
+
+.repo-deletion-list {
+	max-height: 300px;
+	overflow-y: auto;
+	margin-bottom: 15px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	padding: 10px;
+}
+
+.repo-deletion-item {
+	display: flex;
+	flex-direction: column;
+	padding: 10px;
+	margin-bottom: 8px;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.repo-deletion-item:last-child {
+	border-bottom: none;
+	margin-bottom: 0;
+}
+
+.repo-deletion-paths {
+	margin-top: 8px;
+	padding-left: 24px;
+}
+
+.repo-deletion-path {
+	font-size: 13px;
+	color: var(--text-muted);
+	margin: 2px 0;
+	line-height: 1.4;
+}
+
+.modal-button-container {
+	display: flex;
+	gap: 10px;
+	justify-content: flex-end;
+	margin-top: 20px;
+}

@@ -11,6 +11,7 @@ import { SyncChangeDetector } from "@/sync/sync-change-detector";
 import { SyncCheckpointHandler } from "@/sync/sync-checkpoint-handler";
 import { SyncPageFetcher } from "@/sync/sync-page-fetcher";
 import { SyncResumeHandler } from "@/sync/sync-resume";
+import { RepositoryDeletionModal } from "@/ui/repository-deletion-modal";
 import type { Repository, SyncCheckpoint } from "@/types";
 import { ERROR_MESSAGES } from "@/utils/constants";
 import { checkDiskSpace } from "@/utils/disk-check";
@@ -260,7 +261,7 @@ export class SyncService {
 	async performIncrementalSync(): Promise<{
 		added: Repository[];
 		updated: Repository[];
-		removed: string[];
+		removed: Repository[];
 	}> {
 		try {
 			await this.syncStateStore.markSyncStarted();
@@ -287,17 +288,14 @@ export class SyncService {
 				...changes.updated,
 			]);
 
-			// Delete vault files for removed repositories and mark as unstarred
+			// Collect removed repositories for user deletion prompt
+			const removedRepos: Repository[] = [];
 			for (const removedId of changes.removed) {
 				const removedRepo = existingRepos.get(removedId);
 				if (removedRepo) {
-					// Delete the actual markdown files from the vault
-					const deleteResults = await deleteRepositoryFiles(this.app, removedRepo);
-					info(`Deleted vault files for unstarred repository: ${removedRepo.nameWithOwner}`, {
-						results: deleteResults,
-					});
-					// Mark as unstarred in the store
+					// Mark as unstarred in the store (don't delete files yet)
 					await this.repositoryStore.markAsUnstarred(removedId);
+					removedRepos.push(removedRepo);
 				}
 			}
 
@@ -313,13 +311,45 @@ export class SyncService {
 			const message = `Incremental sync: +${changes.added.length} ~${changes.updated.length} -${changes.removed.length}`;
 			new Notice(message);
 
-			return changes;
+			return {
+				added: changes.added,
+				updated: changes.updated,
+				removed: removedRepos,
+			};
 		} catch (err) {
 			const errorMessage = err instanceof Error ? err.message : "Unknown error";
 			await this.syncStateStore.markSyncFailed(errorMessage);
 			new Notice(`Incremental sync failed: ${errorMessage}`);
 			throw err;
 		}
+	}
+
+	/**
+	 * Show repository deletion prompt for unstarred repositories
+	 *
+	 * This method displays a modal allowing users to select which
+	 * unstarred repository folders to delete from the vault.
+	 * Deletions are processed in the background after the modal closes.
+	 *
+	 * @param removedRepos - List of repositories that were unstarred
+	 */
+	async promptForRepositoryDeletion(
+		removedRepos: Repository[],
+	): Promise<void> {
+		if (removedRepos.length === 0) {
+			info("No unstarred repositories to delete");
+			return;
+		}
+
+		info("Showing repository deletion prompt", {
+			count: removedRepos.length,
+		});
+
+		new RepositoryDeletionModal(
+			this.app,
+			removedRepos,
+			this.repositoryStore,
+		).open();
 	}
 
 	/**

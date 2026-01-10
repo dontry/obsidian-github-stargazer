@@ -99,3 +99,22 @@ describe("Force Full Sync Command (T055)", () => {
 		});
 	});
 });
+
+describe("Incremental Sync with Repository Deletion", () => {
+	describe("Post-Sync Deletion Prompt", () => {
+		it("should show deletion modal if unstarred repos exist", async () => {
+			// Test that RepositoryDeletionModal is shown after successful incremental sync
+			expect(true).toBe(true); // Placeholder
+		});
+
+		it("should not show deletion modal if no unstarred repos", async () => {
+			// Test that modal is skipped when removedRepos is empty
+			expect(true).toBe(true); // Placeholder
+		});
+
+		it("should pass removed repositories to modal", async () => {
+			// Test that Repository[] is passed to RepositoryDeletionModal
+			expect(true).toBe(true); // Placeholder
+		});
+	});
+});

@@ -11,13 +11,12 @@ import { SyncChangeDetector } from "@/sync/sync-change-detector";
 import { SyncCheckpointHandler } from "@/sync/sync-checkpoint-handler";
 import { SyncPageFetcher } from "@/sync/sync-page-fetcher";
 import { SyncResumeHandler } from "@/sync/sync-resume";
-import { RepositoryDeletionModal } from "@/ui/repository-deletion-modal";
 import type { Repository, SyncCheckpoint } from "@/types";
+import { RepositoryDeletionModal } from "@/ui/repository-deletion-modal";
 import { ERROR_MESSAGES } from "@/utils/constants";
 import { checkDiskSpace } from "@/utils/disk-check";
 import {
 	createOrUpdateMetadataFile,
-	deleteRepositoryFiles,
 	ensureOwnerDirectoryExists,
 } from "@/utils/file-manager";
 import { error, info, warn } from "@/utils/logger";
@@ -133,7 +132,7 @@ export class SyncService {
 				async (pageRepos, cursor) => {
 					// Convert repositories to final storage incrementally
 					await this.checkpointHandler.convertIncremental(pageRepos);
-					if(!currentCheckpoint) {
+					if (!currentCheckpoint) {
 						throw new Error("Current checkpoint is null");
 					}
 
@@ -293,8 +292,6 @@ export class SyncService {
 			for (const removedId of changes.removed) {
 				const removedRepo = existingRepos.get(removedId);
 				if (removedRepo) {
-					// Mark as unstarred in the store (don't delete files yet)
-					await this.repositoryStore.markAsUnstarred(removedId);
 					removedRepos.push(removedRepo);
 				}
 			}
@@ -333,9 +330,7 @@ export class SyncService {
 	 *
 	 * @param removedRepos - List of repositories that were unstarred
 	 */
-	async promptForRepositoryDeletion(
-		removedRepos: Repository[],
-	): Promise<void> {
+	async promptForRepositoryDeletion(removedRepos: Repository[]): Promise<void> {
 		if (removedRepos.length === 0) {
 			info("No unstarred repositories to delete");
 			return;

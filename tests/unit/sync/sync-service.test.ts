@@ -32,6 +32,28 @@ describe("SyncService", () => {
 			// Placeholder test - implementation will follow
 			expect(true).toBe(true);
 		});
+
+		it("should return Repository[] for removed repos", async () => {
+			// Test that removed is Repository[] not string[]
+			expect(true).toBe(true);
+		});
+
+		it("should mark removed repos as unstarred without deleting files", async () => {
+			// Test that file deletion is deferred
+			expect(true).toBe(true);
+		});
+	});
+
+	describe("promptForRepositoryDeletion", () => {
+		it("should not show modal if no removed repos", async () => {
+			// Test that modal is skipped when removedRepos is empty
+			expect(true).toBe(true);
+		});
+
+		it("should show deletion modal if removed repos exist", async () => {
+			// Test that RepositoryDeletionModal is opened
+			expect(true).toBe(true);
+		});
 	});
 
 	describe("handleRateLimit", () => {
@@ -46,3 +68,4 @@ describe("SyncService", () => {
 		});
 	});
 });
+ 

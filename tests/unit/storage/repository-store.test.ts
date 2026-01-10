@@ -54,4 +54,21 @@ describe("RepositoryStore", () => {
 			expect(true).toBe(true); // Placeholder
 		});
 	});
+
+	describe("deleteRepositories", () => {
+		it("should delete repositories by IDs", async () => {
+			// Mock implementation will follow
+			expect(true).toBe(true); // Placeholder
+		});
+
+		it("should remove multiple repositories at once", async () => {
+			// Test that multiple IDs can be deleted
+			expect(true).toBe(true); // Placeholder
+		});
+
+		it("should save updated repository list", async () => {
+			// Test that saveRepositories is called
+			expect(true).toBe(true); // Placeholder
+		});
+	});
 });

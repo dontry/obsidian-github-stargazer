@@ -106,27 +106,6 @@ export class RepositoryStore {
 	}
 
 	/**
-	 * Mark a repository as unstarred (soft delete)
-	 */
-	async markAsUnstarred(repositoryId: string): Promise<void> {
-		const repository = await this.getRepositoryById(repositoryId);
-
-		if (repository) {
-			repository.isUnstarred = true;
-			await this.updateRepository(repository);
-		}
-	}
-
-	/**
-	 * Remove repositories marked as unstarred
-	 */
-	async removeUnstarred(): Promise<void> {
-		const data = await this.loadRepositories();
-		data.repositories = data.repositories.filter((repo) => !repo.isUnstarred);
-		await this.saveRepositories(data);
-	}
-
-	/**
 	 * Delete repositories by their IDs (complete removal from store)
 	 */
 	async deleteRepositories(repositoryIds: string[]): Promise<void> {

@@ -158,7 +158,7 @@ export class RepositoryDeletionModal extends Modal {
 		// Delete button handler - close immediately and process in background
 		deleteButton.addEventListener("click", () => {
 			this.close();
-			this.processSelectedDeletions();
+			this.processSelectedDeletions().catch(err => console.error(err));
 		});
 
 		// Cancel button handler

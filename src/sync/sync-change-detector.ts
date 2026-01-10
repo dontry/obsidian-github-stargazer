@@ -31,18 +31,13 @@ export class SyncChangeDetector {
 			if (!existingRepo) {
 				// New repository
 				added.push(repo);
-			} else if (this.hasRepositoryChanged(existingRepo, repo)) {
-				// Updated repository
-				updated.push(repo);
 			}
 		}
 
 		// Find removed repositories
 		const removed: string[] = [];
 		for (const id of existingIds) {
-			if (!currentIds.has(id)) {
-				removed.push(id);
-			}  else if (existing.get(id)?.isUnstarred) {
+			if (!currentIds.has(id) || existing.get(id)?.isUnstarred) {
 				removed.push(id);
 			}
 		}

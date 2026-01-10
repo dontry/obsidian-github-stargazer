@@ -61,7 +61,7 @@ If your plugin does not need CSS, delete this file.
 
 .repo-deletion-item {
 	display: flex;
-	flex-direction: column;
+	flex-direction: row;
 	padding: 10px;
 	margin-bottom: 8px;
 	border-bottom: 1px solid var(--background-modifier-border);

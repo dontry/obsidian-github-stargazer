@@ -1,5 +1,6 @@
 import { Notice, Plugin } from "obsidian";
 import { SyncCommand } from "@/commands/sync-command";
+import { UnstarCommand } from "@/commands/unstar-command";
 import { RepositoryStore } from "@/storage/repository-store";
 import { SettingsStore } from "@/storage/settings-store";
 import { SyncStateStore } from "@/storage/sync-state-store";
@@ -92,10 +93,15 @@ export default class GitHubStargazerPlugin extends Plugin {
 
 		// Batch un-star repositories command
 		this.addCommand({
-			id: COMMAND_IDS.BATCH_UNSTAR,
-			name: COMMAND_NAMES.BATCH_UNSTAR,
+			id: COMMAND_IDS.UNSTAR,
+			name: COMMAND_NAMES.UNSTAR,
 			callback: () => {
-				new Notice("Batch un-star coming soon!");
+				const unstarCommand = new UnstarCommand();
+				unstarCommand.execute(
+					this.app,
+					this.settings.githubToken,
+					this.repositoryStore,
+				).catch(err => console.error(err));
 			},
 		});
 	}

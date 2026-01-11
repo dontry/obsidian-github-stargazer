@@ -90,14 +90,14 @@ export const SUCCESS_MESSAGES = {
 export const COMMAND_IDS = {
 	SYNC: 'github-stargazer-sync',
 	OPEN_VIEW: 'github-stargazer-open-view',
-	BATCH_UNSTAR: 'github-stargazer-batch-unstar',
+	UNSTAR: 'github-stargazer-batch-unstar',
 } as const;
 
 /** Command names (user-facing) */
 export const COMMAND_NAMES = {
 	SYNC: 'Sync starred repositories',
 	OPEN_VIEW: 'Open repository view',
-	BATCH_UNSTAR: 'Batch un-star repositories',
+	UNSTAR: 'Unstar repositories',
 } as const;
 
 /** Default tag colors */

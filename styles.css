@@ -90,3 +90,61 @@ If your plugin does not need CSS, delete this file.
 	justify-content: flex-end;
 	margin-top: 20px;
 }
+
+/* Unstar Modal Styles */
+.unstar-buttons {
+	display: flex;
+	gap: 10px;
+	margin-bottom: 15px;
+}
+
+.unstar-list {
+	max-height: 300px;
+	overflow-y: auto;
+	margin-bottom: 15px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	padding: 10px;
+}
+
+.unstar-item {
+	display: flex;
+	flex-direction: row;
+	align-items: flex-start;
+	padding: 10px;
+	margin-bottom: 8px;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.unstar-item:last-child {
+	border-bottom: none;
+	margin-bottom: 0;
+}
+
+.unstar-label-container {
+	display: flex;
+	flex-direction: column;
+	margin-left: 10px;
+	flex: 1;
+}
+
+.unstar-name-label {
+	font-weight: 500;
+	font-size: 14px;
+}
+
+.unstar-desc-label {
+	font-size: 13px;
+	color: var(--text-muted);
+	margin-top: 2px;
+	line-height: 1.4;
+}
+
+.unstar-warning {
+	background-color: var(--background-secondary-alt);
+	border: 1px solid var(--text-warning);
+	border-radius: 6px;
+	padding: 12px;
+	margin-bottom: 15px;
+	font-size: 14px;
+}

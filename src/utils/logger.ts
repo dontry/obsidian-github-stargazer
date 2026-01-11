@@ -35,10 +35,14 @@ function sanitizeError(error: unknown): SafeErrorData {
 	if (typeof error === 'object' && error !== null) {
 		// Extract type and message, exclude stack traces (may contain tokens)
 		const { type, message } = error as Record<string, unknown>;
-		return {
-			type: typeof type === 'string' ? type : undefined,
-			message: typeof message === 'string' ? message : 'Unknown error',
-		};
+		if (type && message) {
+			return {
+				type: typeof type === 'string' ? type : undefined,
+				message: typeof message === 'string' ? message : 'Unknown error',
+			};
+		}
+
+		return {message: JSON.stringify(error) }
 	}
 
 	return { message: 'Unknown error' };

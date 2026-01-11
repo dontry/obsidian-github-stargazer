@@ -111,3 +111,37 @@ export const DEFAULT_TAG_COLORS = [
 	'#34495e', // Dark Blue/Grey
 	'#e67e22', // Carrot
 ] as const;
+
+/** Overview base file name */
+export const OVERVIEW_BASE_FILE = 'Repositories Overview.base';
+
+/** Overview base file template with Dataview configuration */
+export const OVERVIEW_BASE_TEMPLATE = 
+`views:
+  - type: table
+    name: Table
+    filters:
+      and:
+        - file.name.endsWith("metadata")
+    order:
+      - name
+      - tags
+      - starCount
+      - language
+      - description
+      - url
+      - createdAt
+      - updatedAt
+      - file.path
+    sort:
+      - property: name
+        direction: ASC
+      - property: updatedAt
+        direction: ASC
+      - property: createdAt
+        direction: ASC
+    columnSize:
+      note.name: 245
+      note.tags: 456
+      note.language: 91
+      note.description: 352`;

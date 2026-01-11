@@ -13,7 +13,11 @@ import { SyncPageFetcher } from "@/sync/sync-page-fetcher";
 import { SyncResumeHandler } from "@/sync/sync-resume";
 import type { Repository, SyncCheckpoint } from "@/types";
 import { RepositoryDeletionModal } from "@/ui/repository-deletion-modal";
-import { ERROR_MESSAGES } from "@/utils/constants";
+import {
+	ERROR_MESSAGES,
+	OVERVIEW_BASE_FILE,
+	OVERVIEW_BASE_TEMPLATE,
+} from "@/utils/constants";
 import { checkDiskSpace } from "@/utils/disk-check";
 import {
 	createOrUpdateMetadataFile,
@@ -237,6 +241,9 @@ export class SyncService {
 			info("Sync completed", {
 				totalRepositories: repositories.length,
 			});
+
+			// Generate overview base file if it doesn't exist
+			await this.generateOverviewBaseFile();
 
 			new Notice(`Successfully synced ${repositories.length} repositories!`);
 			return repositories;
@@ -591,6 +598,39 @@ export class SyncService {
 			new Notice(`${noticeMessage}, ${failedCount} failed`);
 		} else {
 			new Notice(noticeMessage);
+		}
+	}
+
+	/**
+	 * Generate overview base file if it doesn't exist
+	 *
+	 * Creates a "Repositories Overview.base" file in the vault root directory
+	 * that provides a Dataview-based table view of all repositories.
+	 * Only generates the file if it doesn't already exist to preserve user modifications.
+	 */
+	private async generateOverviewBaseFile(): Promise<void> {
+		try {
+			// Check if file already exists
+			const existingFile = this.app.vault.getAbstractFileByPath(
+				OVERVIEW_BASE_FILE,
+			);
+			if (existingFile) {
+				info("Overview base file already exists, skipping generation", {
+					filePath: OVERVIEW_BASE_FILE,
+				});
+				return;
+			}
+
+			// Create the base file
+			await this.app.vault.create(OVERVIEW_BASE_FILE, OVERVIEW_BASE_TEMPLATE);
+			info("Overview base file created", {
+				filePath: OVERVIEW_BASE_FILE,
+			});
+		} catch (err) {
+			// Don't fail sync if base file generation fails
+			warn("Failed to generate overview base file", {
+				error: err instanceof Error ? err.message : "Unknown error",
+			});
 		}
 	}
 }

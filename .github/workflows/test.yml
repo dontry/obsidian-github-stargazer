@@ -1,4 +1,4 @@
-name: Node.js build
+name: Unit tests
 
 on:
     push:
@@ -7,7 +7,7 @@ on:
         branches: ["**"]
 
 jobs:
-    build:
+    test:
         runs-on: ubuntu-latest
 
         strategy:
@@ -24,6 +24,4 @@ jobs:
                   cache: "pnpm"
             - run: corepack enable && corepack prepare pnpm@latest --activate
             - run: pnpm install --frozen-lockfile
-            - run: pnpm run build --if-present
-            - run: pnpm run lint
-
+            - run: pnpm test

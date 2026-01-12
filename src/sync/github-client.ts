@@ -368,7 +368,7 @@ export class GitHubGraphQLClient {
 					bytes[i] = decoded.charCodeAt(i);
 				}
 				content = new TextDecoder("utf-8").decode(bytes);
-			} catch (error) {
+			} catch {
 				throw new ReadmeEncodingError(repository, data.encoding);
 			}
 

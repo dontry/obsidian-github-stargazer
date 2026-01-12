@@ -124,7 +124,7 @@ export class ReadmeTimeoutError extends ReadmeFetchError {
 export class ReadmeNetworkError extends ReadmeFetchError {
 	constructor(
 		repository: string,
-		public readonly originalError: Error | unknown,
+		public readonly originalError: unknown,
 	) {
 		super(
 			`Network error while fetching README for '${repository}': ${originalError instanceof Error ? originalError.message : String(originalError)}`,

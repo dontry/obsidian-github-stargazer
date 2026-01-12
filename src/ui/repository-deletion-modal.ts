@@ -83,7 +83,7 @@ export class RepositoryDeletionModal extends Modal {
 			});
 
 			// Label with repo name
-			const label = repoItem.createEl("label", {
+			repoItem.createEl("label", {
 				text: repo.nameWithOwner,
 				attr: { for: `repo-${repo.id}` },
 			});

@@ -111,13 +111,13 @@ export class CheckpointValidator {
 
 			// Transform SUCCESS to NOT_AVAILABLE when sha/vaultFilePath are empty (no README exists)
 			if (data.readmeMetadata instanceof Map) {
-				for (const [repo, metadata] of data.readmeMetadata.entries()) {
+				for (const [, metadata] of data.readmeMetadata.entries()) {
 					if (
 						metadata &&
 						typeof metadata === "object" &&
-						metadata.fetchStatus === "success" &&
-						!metadata.sha &&
-						!metadata.vaultFilePath
+						(metadata as Record<string, unknown>).fetchStatus === "success" &&
+						!(metadata as Record<string, unknown>).sha &&
+						!(metadata as Record<string, unknown>).vaultFilePath
 					) {
 						// Transform to NOT_AVAILABLE status
 						(metadata as Record<string, unknown>).fetchStatus =
@@ -125,13 +125,13 @@ export class CheckpointValidator {
 					}
 				}
 			} else if (typeof data.readmeMetadata === "object") {
-				for (const [repo, metadata] of Object.entries(data.readmeMetadata)) {
+				for (const [, metadata] of Object.entries(data.readmeMetadata)) {
 					if (
 						metadata &&
 						typeof metadata === "object" &&
-						metadata.fetchStatus === "success" &&
-						!metadata.sha &&
-						!metadata.vaultFilePath
+						(metadata as Record<string, unknown>).fetchStatus === "success" &&
+						!(metadata as Record<string, unknown>).sha &&
+						!(metadata as Record<string, unknown>).vaultFilePath
 					) {
 						// Transform to NOT_AVAILABLE status
 						(metadata as Record<string, unknown>).fetchStatus =

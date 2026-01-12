@@ -92,7 +92,6 @@ export function generateReadmeFilePath(owner: string, repo: string): string {
 	const MAX_PATH_LENGTH = 254;
 	if (filePath.length > MAX_PATH_LENGTH) {
 		// Calculate how much we need to trim
-		const suffix = "-README.md";
 		const ownerRepoLength = filePath.length;
 		const overflow = ownerRepoLength - MAX_PATH_LENGTH;
 		

@@ -88,7 +88,7 @@ export class VaultFileManager {
 		try {
 			const content = await this.app.vault.adapter.read(normalizedPath);
 			return content;
-		} catch (error) {
+		} catch {
 			// File doesn't exist or read error
 			return null;
 		}
@@ -323,7 +323,7 @@ export class VaultFileManager {
 				};
 			}
 			throw new Error("stat data is unavailable");
-		} catch (error) {
+		} catch {
 			return null;
 		}
 	}

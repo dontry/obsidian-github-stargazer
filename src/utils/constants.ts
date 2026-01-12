@@ -89,14 +89,14 @@ export const SUCCESS_MESSAGES = {
 /** Command IDs */
 export const COMMAND_IDS = {
 	SYNC: 'github-stargazer-sync',
-	OPEN_VIEW: 'github-stargazer-open-view',
+	FORCE_FULL_SYNC: 'github-stargazer-force-full-sync',
 	UNSTAR: 'github-stargazer-batch-unstar',
 } as const;
 
 /** Command names (user-facing) */
 export const COMMAND_NAMES = {
 	SYNC: 'Sync starred repositories',
-	OPEN_VIEW: 'Open repository view',
+	FORCE_FULL_SYNC: 'Force full sync (delete checkpoint)',
 	UNSTAR: 'Unstar repositories',
 } as const;
 

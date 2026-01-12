@@ -148,3 +148,22 @@ If your plugin does not need CSS, delete this file.
 	margin-bottom: 15px;
 	font-size: 14px;
 }
+
+/* Command Menu Modal Styles */
+.ghs-command-menu__item {
+	display: flex;
+	align-items: center;
+	height: 100%;
+}
+
+.ghs-command-menu__content {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.ghs-command-menu__icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}

@@ -94,6 +94,7 @@ If your plugin does not need CSS, delete this file.
 /* Unstar Modal Styles */
 .unstar-buttons {
 	display: flex;
+	align-items: center;
 	gap: 10px;
 	margin-bottom: 15px;
 }

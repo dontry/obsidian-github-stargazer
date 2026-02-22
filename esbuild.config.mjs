@@ -55,6 +55,7 @@ if (prod) {
 	// Copy manifest.json and styles.css to dist folder
 	copyFileSync("manifest.json", `${outdir}/manifest.json`);
 	copyFileSync("styles.css", `${outdir}/styles.css`);
+	context.dispose();
 	process.exit(0);
 } else {
 	await context.watch();

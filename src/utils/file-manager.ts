@@ -115,14 +115,25 @@ export async function deleteRepositoryFiles(
 	// Delete metadata file if path exists
 	if (metadataPath) {
 		try {
-			await app.vault.adapter.remove(metadataPath);
-			results.push({
-				success: true,
-				filePath: metadataPath,
-				action: "deleted",
-				error: null,
-				message: "Metadata file deleted",
-			});
+			const metadataExists = await app.vault.adapter.exists(metadataPath);
+			if (metadataExists) {
+				await app.vault.adapter.remove(metadataPath);
+				results.push({
+					success: true,
+					filePath: metadataPath,
+					action: "deleted",
+					error: null,
+					message: "Metadata file deleted",
+				});
+			} else {
+				results.push({
+					success: true,
+					filePath: metadataPath,
+					action: "skipped",
+					error: null,
+					message: "Metadata file not found, skipping",
+				});
+			}
 		} catch (error) {
 			results.push({
 				success: false,
@@ -137,14 +148,25 @@ export async function deleteRepositoryFiles(
 	// Delete README file if path exists
 	if (readmePath) {
 		try {
-			await app.vault.adapter.remove(readmePath);
-			results.push({
-				success: true,
-				filePath: readmePath,
-				action: "deleted",
-				error: null,
-				message: "README file deleted",
-			});
+			const readmeExists = await app.vault.adapter.exists(readmePath);
+			if (readmeExists) {
+				await app.vault.adapter.remove(readmePath);
+				results.push({
+					success: true,
+					filePath: readmePath,
+					action: "deleted",
+					error: null,
+					message: "README file deleted",
+				});
+			} else {
+				results.push({
+					success: true,
+					filePath: readmePath,
+					action: "skipped",
+					error: null,
+					message: "README file not found, skipping",
+				});
+			}
 		} catch (error) {
 			results.push({
 				success: false,

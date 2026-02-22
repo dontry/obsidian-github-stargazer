@@ -87,14 +87,18 @@ export class UnstarModal extends Modal {
 			cls: "unstar-search-count",
 		});
 
-		// Select All / Select None buttons
+		// Select All / Select None buttons + selected count
 		const buttonContainer = contentEl.createDiv({
 			cls: "unstar-buttons",
 		});
 
-
 		const selectNoneButton = buttonContainer.createEl("button", {
 			text: "Select None",
+		});
+
+		const selectedCountEl = buttonContainer.createEl("span", {
+			text: "0 selected",
+			cls: "unstar-selected-count",
 		});
 
 		// Repository list with checkboxes
@@ -152,6 +156,7 @@ export class UnstarModal extends Modal {
 				} else {
 					this.selectedRepoIds.delete(repo.id);
 				}
+				updateSelectedCount();
 			});
 		}
 
@@ -160,6 +165,12 @@ export class UnstarModal extends Modal {
 		};
 
 		const isVisible = (el: HTMLElement) => el.style.display !== "none";
+
+		const updateSelectedCount = () => {
+			const n = this.selectedRepoIds.size;
+			selectedCountEl.textContent = n === 0 ? "0 selected" : `${n} selected`;
+			unstarButton.textContent = n === 0 ? "Unstar Selected" : `Unstar Selected (${n})`;
+		};
 
 		const updateFilteredList = () => {
 			const query = searchInput.value.trim().toLowerCase();
@@ -194,6 +205,7 @@ export class UnstarModal extends Modal {
 				checkbox.checked = false;
 				this.selectedRepoIds.delete(repoId);
 			});
+			updateSelectedCount();
 		});
 
 		// Action buttons container
@@ -204,6 +216,7 @@ export class UnstarModal extends Modal {
 		const unstarButton = actionContainer.createEl("button", {
 			text: "Unstar Selected",
 			cls: "mod-warning",
+			attr: { "aria-live": "polite" },
 		});
 
 		const cancelButton = actionContainer.createEl("button", {
@@ -251,58 +264,26 @@ export class UnstarModal extends Modal {
 		const repoIds = Array.from(this.selectedRepoIds);
 
 		// Process repositories in batches for rate limiting
+		// Collect all settled results to tally successes/failures without re-running
 		for (let i = 0; i < repoIds.length; i += MAX_CONCURRENT_UNSTARS) {
 			const batch = repoIds.slice(i, i + MAX_CONCURRENT_UNSTARS);
 
-			await Promise.allSettled(
+			const results = await Promise.allSettled(
 				batch.map((repoId) => this.unstarRepository(repoId)),
 			);
+
+			for (const result of results) {
+				if (result.status === "fulfilled") {
+					successCount++;
+				} else {
+					failureCount++;
+					error("Error during repository unstar", result.reason);
+				}
+			}
 
 			// Update progress notice
 			const processed = Math.min(i + MAX_CONCURRENT_UNSTARS, repoIds.length);
 			new Notice(`Processing ${processed}/${repoIds.length}...`);
-		}
-
-		// Count final results
-		for (const repoId of repoIds) {
-			const repo = this.starredRepos.find((r) => r.id === repoId);
-			if (!repo) {
-				continue;
-			}
-
-			try {
-				// Unstar on GitHub
-				info("Unstarring repository on GitHub", {
-					repo: repo.nameWithOwner,
-				});
-				await this.githubClient.unstarRepository(repo.id);
-
-				// Delete local files
-				info("Deleting repository files", {
-					repo: repo.nameWithOwner,
-				});
-				const deleteResults = await deleteRepositoryFiles(this.app, repo);
-
-				if (deleteResults.some((r) => !r.success)) {
-					error("Failed to delete some repository files", {
-						repo: repo.nameWithOwner,
-						results: deleteResults,
-					});
-					failureCount++;
-					continue;
-				}
-
-				// Remove from repository store
-				await this.repositoryStore.deleteRepositories([repo.id]);
-				info("Removed repository from store", {
-					repo: repo.nameWithOwner,
-				});
-
-				successCount++;
-			} catch (err) {
-				error("Error during repository unstar", err);
-				failureCount++;
-			}
 		}
 
 		info("Batch unstar completed", {

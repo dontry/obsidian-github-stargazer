@@ -6,6 +6,10 @@
 
 import type { App, TFile } from "obsidian";
 import type { FileOperationResult, Repository } from "@/types";
+import {
+	generateMetadataFilePath,
+	generateReadmeFilePath,
+} from "@/utils/path-utils";
 
 const FRONTMATTER_REGEX = /^---\n[\s\S]*?\n---/;
 
@@ -106,14 +110,15 @@ export async function deleteRepositoryFiles(
 	repo: Repository,
 ): Promise<FileOperationResult[]> {
 	const results: FileOperationResult[] = [];
+	const [metadataPath, readmePath] = resolveRepositoryFilePaths(repo);
 
 	// Delete metadata file if path exists
-	if (repo.metadataFilePath) {
+	if (metadataPath) {
 		try {
-			await app.vault.adapter.remove(repo.metadataFilePath);
+			await app.vault.adapter.remove(metadataPath);
 			results.push({
 				success: true,
-				filePath: repo.metadataFilePath,
+				filePath: metadataPath,
 				action: "deleted",
 				error: null,
 				message: "Metadata file deleted",
@@ -121,7 +126,7 @@ export async function deleteRepositoryFiles(
 		} catch (error) {
 			results.push({
 				success: false,
-				filePath: repo.metadataFilePath,
+				filePath: metadataPath,
 				action: "deleted",
 				error: error as Error,
 				message: `Failed to delete metadata file: ${(error as Error).message}`,
@@ -130,12 +135,12 @@ export async function deleteRepositoryFiles(
 	}
 
 	// Delete README file if path exists
-	if (repo.readmeVaultFilePath) {
+	if (readmePath) {
 		try {
-			await app.vault.adapter.remove(repo.readmeVaultFilePath);
+			await app.vault.adapter.remove(readmePath);
 			results.push({
 				success: true,
-				filePath: repo.readmeVaultFilePath,
+				filePath: readmePath,
 				action: "deleted",
 				error: null,
 				message: "README file deleted",
@@ -143,7 +148,7 @@ export async function deleteRepositoryFiles(
 		} catch (error) {
 			results.push({
 				success: false,
-				filePath: repo.readmeVaultFilePath,
+				filePath: readmePath,
 				action: "deleted",
 				error: error as Error,
 				message: `Failed to delete README file: ${(error as Error).message}`,
@@ -152,8 +157,8 @@ export async function deleteRepositoryFiles(
 	}
 
 	// Remove owner/repo directory if empty
-	if (repo.metadataFilePath || repo.readmeVaultFilePath) {
-		const basePath = repo.metadataFilePath || repo.readmeVaultFilePath;
+	if (metadataPath || readmePath) {
+		const basePath = metadataPath || readmePath;
 		if (basePath) {
 			const pathParts = basePath.split("/");
 			const repoDir = pathParts.slice(0, 2).join("/");
@@ -168,9 +173,27 @@ export async function deleteRepositoryFiles(
 				console.warn(`Failed to remove empty directory: ${repoDir}`, error);
 			}
 		}
+	} else {
+		console.warn(`No file paths found for repository: ${repo.nameWithOwner}`);
 	}
 
 	return results;
+}
+
+function resolveRepositoryFilePaths(repo: Repository): [string | undefined, string | undefined] {
+	if (repo.metadataFilePath || repo.readmeVaultFilePath) {
+		return [repo.metadataFilePath, repo.readmeVaultFilePath];
+	}
+
+	const [owner, repoName] = repo.nameWithOwner.split("/");
+	if (!owner || !repoName) {
+		return [undefined, undefined];
+	}
+
+	return [
+		generateMetadataFilePath(owner, repoName),
+		generateReadmeFilePath(owner, repoName),
+	];
 }
 
 /**

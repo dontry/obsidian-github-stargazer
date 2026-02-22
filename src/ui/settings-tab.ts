@@ -241,7 +241,7 @@ export class GitHubStargazerSettingTab extends PluginSettingTab {
 			.addButton((button) =>
 				button.setButtonText("Open").onClick(() => {
 					window.open(
-						"https://github.com/yourusername/obsidian-github-stargazer",
+						"https://github.com/dontry/obsidian-github-stargazer",
 						"_blank",
 					);
 				}),

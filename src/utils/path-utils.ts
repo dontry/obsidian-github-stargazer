@@ -4,7 +4,7 @@
  * @module utils/path-utils
  */
 
-const MAX_PATH_SEGMENT_LENGTH = 100; // Further reduced to keep full path well under 500 chars
+const MAX_PATH_SEGMENT_LENGTH = 200; // Further reduced to keep full path well under 500 chars
 
 /**
  * Sanitize a path segment (owner or repository name) for cross-platform compatibility

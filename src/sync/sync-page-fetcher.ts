@@ -5,6 +5,10 @@ import type { GetStarredRepositoriesResponse } from "@/sync/graphql-queries";
 import type { RateLimiter } from "@/sync/rate-limiter";
 import type { Repository, SyncCheckpoint } from "@/types";
 import { info } from "@/utils/logger";
+import {
+	generateMetadataFilePath,
+	generateReadmeFilePath,
+} from "@/utils/path-utils";
 
 /**
  * Page fetcher for repository synchronization
@@ -129,6 +133,15 @@ export class SyncPageFetcher {
 	): Repository[] {
 		return response.viewer.starredRepositories.edges.map((edge) => {
 			const node = edge.node;
+			const metadataFilePath = generateMetadataFilePath(
+				node.owner.login,
+				node.name,
+			);
+			const readmeVaultFilePath = generateReadmeFilePath(
+				node.owner.login,
+				node.name,
+			);
+
 			return {
 				id: node.id,
 				name: node.name,
@@ -142,6 +155,8 @@ export class SyncPageFetcher {
 				updatedAt: node.updatedAt,
 				starredAt: edge.starredAt,
 				readmeSha: node.readme?.oid ?? null,
+				readmeVaultFilePath,
+				metadataFilePath,
 				topics: node.repositoryTopics.nodes.map((topicNode) => topicNode.topic.name),
 				linkedResources: [],
 			};

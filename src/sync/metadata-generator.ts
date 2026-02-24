@@ -186,11 +186,13 @@ export class MetadataGenerator {
 			ownerLogin: repo.owner,
 			createdAt: repo.createdAt,
 			updatedAt: repo.updatedAt,
-			homepageUrl: null,
-			license: null,
-			forkCount: 0,
-			openIssuesCount: 0,
-			watchersCount: 0,
+			// Extended fields — populated from the GraphQL response via Repository.
+			// Fall back to null/0 for repos synced before feature 006 was deployed.
+			homepageUrl: repo.homepageUrl ?? null,
+			license: repo.license ?? null,
+			forkCount: repo.forkCount ?? 0,
+			openIssuesCount: repo.openIssuesCount ?? 0,
+			watchersCount: repo.watchersCount ?? 0,
 		};
 	}
 }

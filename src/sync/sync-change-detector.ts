@@ -31,6 +31,9 @@ export class SyncChangeDetector {
 			if (!existingRepo) {
 				// New repository
 				added.push(repo);
+			} else if (this.hasRepositoryChanged(existingRepo, repo)) {
+				// Existing repository with changed fields
+				updated.push(repo);
 			}
 		}
 
@@ -46,7 +49,7 @@ export class SyncChangeDetector {
 	}
 
 	/**
-	 * Check if repository has changed
+	 * Check if repository has changed (core fields + extended metadata fields)
 	 */
 	private hasRepositoryChanged(
 		existing: Repository,
@@ -57,7 +60,13 @@ export class SyncChangeDetector {
 			existing.starCount !== current.starCount ||
 			existing.description !== current.description ||
 			existing.primaryLanguage !== current.primaryLanguage ||
-			existing.readmeSha !== current.readmeSha
+			existing.readmeSha !== current.readmeSha ||
+			// Extended metadata fields (feature 006-repo-metadata-frontmatter)
+			existing.forkCount !== current.forkCount ||
+			existing.openIssuesCount !== current.openIssuesCount ||
+			existing.watchersCount !== current.watchersCount ||
+			existing.homepageUrl !== current.homepageUrl ||
+			existing.license !== current.license
 		);
 	}
 }

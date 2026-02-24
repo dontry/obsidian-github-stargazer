@@ -159,6 +159,12 @@ export class SyncPageFetcher {
 				metadataFilePath,
 				topics: node.repositoryTopics.nodes.map((topicNode) => topicNode.topic.name),
 				linkedResources: [],
+				// Extended metadata fields (feature 006-repo-metadata-frontmatter)
+				homepageUrl: node.homepageUrl ?? null,
+				license: node.licenseInfo?.spdxId ?? null,
+				forkCount: node.forkCount,
+				openIssuesCount: node.issues.totalCount,
+				watchersCount: node.watchers.totalCount,
 			};
 		});
 	}

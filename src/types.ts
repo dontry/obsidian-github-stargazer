@@ -38,7 +38,7 @@ export interface Repository {
 	/** SHA hash of the README content from GitHub API (for change detection) */
 	readmeSha: string | null;
 	/** Path to the README markdown file in the vault (e.g., "facebook/react/facebook-react-readme.md") */
-	readmeVaultFilePath?: string; 
+	readmeVaultFilePath?: string;
 	/** Whether the user has manually edited the README file in the vault */
 	localReadmeModified?: boolean;
 	/** Path to metadata file in new structure (e.g., "facebook/react/facebook-react-metadata.md") @feature 006-repo-metadata-frontmatter */
@@ -47,6 +47,16 @@ export interface Repository {
 	metadataSha?: string;
 	/** Whether the user has added notes to the metadata file @feature 006-repo-metadata-frontmatter */
 	hasUserNotes?: boolean;
+	/** Custom homepage / website URL set on the repo (optional) @feature 006-repo-metadata-frontmatter */
+	homepageUrl?: string | null;
+	/** SPDX license identifier (e.g. "MIT", "Apache-2.0") or null @feature 006-repo-metadata-frontmatter */
+	license?: string | null;
+	/** Total number of forks @feature 006-repo-metadata-frontmatter */
+	forkCount?: number;
+	/** Total number of open issues @feature 006-repo-metadata-frontmatter */
+	openIssuesCount?: number;
+	/** Total number of watchers/subscribers @feature 006-repo-metadata-frontmatter */
+	watchersCount?: number;
 }
 
 /**

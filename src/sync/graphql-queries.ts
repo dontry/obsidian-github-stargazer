@@ -45,6 +45,17 @@ export const GET_STARRED_REPOSITORIES_QUERY = `
 									createdAt
 									updatedAt
 									pushedAt
+									homepageUrl
+									forkCount
+									issues(states: OPEN) {
+										totalCount
+									}
+									watchers {
+										totalCount
+									}
+									licenseInfo {
+										spdxId
+									}
 									owner {
 										login
 										url
@@ -167,6 +178,17 @@ export interface GetStarredRepositoriesResponse {
 					createdAt: string;
 					updatedAt: string;
 					pushedAt: string;
+					homepageUrl: string | null;
+					forkCount: number;
+					issues: {
+						totalCount: number;
+					};
+					watchers: {
+						totalCount: number;
+					};
+					licenseInfo: {
+						spdxId: string | null;
+					} | null;
 					owner: {
 						login: string;
 						url: string;

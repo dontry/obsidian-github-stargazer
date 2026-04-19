@@ -3,7 +3,7 @@ name: Release
 on:
     push:
         branches:
-            - main
+            - master
         paths:
             - package.json
             - manifest.json
@@ -28,8 +28,6 @@ jobs:
                   fetch-depth: 2
 
             - uses: pnpm/action-setup@v4
-              with:
-                  version: 9
 
             - name: Use Node.js 20.x
               uses: actions/setup-node@v4

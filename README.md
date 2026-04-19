@@ -2,6 +2,8 @@
 
 An Obsidian plugin that syncs and manages your GitHub starred repositories directly in your vault. Keep track of interesting projects, add personal notes, tag them for easy discovery, and build your personal knowledge base of useful code repositories.
 
+![overview](./images/dataview.png)
+
 ## Features
 
 - **Sync Starred Repositories** - Automatically fetch all repositories you've starred on GitHub using the GraphQL API
@@ -106,24 +108,28 @@ flowchart TD
 ```
 
 **What Gets Saved**:
+
 - Sync position (which page you're on)
 - Repositories fetched so far
 - Total repository count
 - Timestamp and session ID
 
 **When Sync is Interrupted**:
+
 1. Next sync attempt shows a confirmation modal
 2. Choose to resume from checkpoint or start fresh
 3. Resume skips already-fetched repositories (saves time and API quota)
 4. Progress is shown in real-time with fetched/converted counts
 
 **Checkpoint Management**:
+
 - Checkpoints are automatically deleted after successful sync
 - View checkpoint info in Settings → GitHub Stargazer
 - Manually reset checkpoint from settings if needed
 - Checkpoint file location: `.obsidian/plugins/obsidian-github-stargazer/.sync-checkpoint.json`
 
 **Error Recovery**:
+
 - Network errors trigger automatic retry (3 attempts with exponential backoff)
 - Checkpoint is preserved even if sync fails
 - Corrupted checkpoint files are automatically preserved for debugging
@@ -131,6 +137,7 @@ flowchart TD
 ### Managing Repositories
 
 Once synced, you can:
+
 - **Browse** all your starred repositories in an organized view
 - **Add Notes** - Write personal notes about why you starred a repo or how you use it
 - **Apply Tags** - Create custom tags to categorize repositories by technology, use case, or any system you prefer
@@ -226,6 +233,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## Code Quality
 
 This project uses:
+
 - **TypeScript** with strict mode for type safety
 - **ESLint** with Obsidian-specific rules for code quality
 - **Vitest** for unit testing
@@ -244,6 +252,7 @@ MIT License - see LICENSE file for details
 ## Support
 
 If you encounter any issues or have feature requests, please:
+
 - Check existing [GitHub Issues](https://github.com/yourusername/obsidian-github-stargazer/issues)
 - Create a new issue with details about the problem
 - Include error logs and steps to reproduce

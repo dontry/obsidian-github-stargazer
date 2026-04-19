@@ -1,0 +1,122 @@
+name: Release
+
+on:
+    push:
+        branches:
+            - main
+        paths:
+            - package.json
+            - manifest.json
+            - versions.json
+            - version-bump.mjs
+            - scripts/versioning.mjs
+            - src/**
+            - styles.css
+            - esbuild.config.mjs
+            - pnpm-lock.yaml
+
+permissions:
+    contents: write
+
+jobs:
+    release:
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 2
+
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 9
+
+            - name: Use Node.js 20.x
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 20.x
+                  cache: pnpm
+
+            - name: Install dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: Detect version change
+              id: version_change
+              shell: bash
+              run: |
+                  CURRENT_VERSION=$(node -p "JSON.parse(require('node:fs').readFileSync('package.json', 'utf8')).version")
+                  echo "current_version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
+
+                  if [ "${{ github.event.before }}" = "0000000000000000000000000000000000000000" ]; then
+                    echo "changed=true" >> "$GITHUB_OUTPUT"
+                    exit 0
+                  fi
+
+                  PREVIOUS_VERSION=$(git show "${{ github.event.before }}:package.json" | node -p "JSON.parse(require('node:fs').readFileSync(0, 'utf8')).version")
+
+                  if [ "$CURRENT_VERSION" = "$PREVIOUS_VERSION" ]; then
+                    echo "changed=false" >> "$GITHUB_OUTPUT"
+                  else
+                    echo "changed=true" >> "$GITHUB_OUTPUT"
+                  fi
+
+            - name: Validate release metadata
+              if: steps.version_change.outputs.changed == 'true'
+              run: |
+                  node --input-type=module <<'NODE'
+                  import { readFileSync } from "node:fs";
+                  import { validateReleaseMetadata } from "./scripts/versioning.mjs";
+
+                  const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
+                  const manifest = JSON.parse(readFileSync("manifest.json", "utf8"));
+                  const versions = JSON.parse(readFileSync("versions.json", "utf8"));
+                  const errors = validateReleaseMetadata(packageJson, manifest, versions);
+
+                  if (errors.length > 0) {
+                  	console.error(errors.map((error) => `- ${error}`).join("\n"));
+                  	process.exit(1);
+                  }
+                  NODE
+
+            - name: Check for existing release
+              if: steps.version_change.outputs.changed == 'true'
+              id: existing_release
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              shell: bash
+              run: |
+                  if gh release view "${{ steps.version_change.outputs.current_version }}" >/dev/null 2>&1; then
+                    echo "exists=true" >> "$GITHUB_OUTPUT"
+                  else
+                    echo "exists=false" >> "$GITHUB_OUTPUT"
+                  fi
+
+            - name: Build plugin
+              if: steps.version_change.outputs.changed == 'true' && steps.existing_release.outputs.exists == 'false'
+              run: pnpm run build
+
+            - name: Verify release assets
+              if: steps.version_change.outputs.changed == 'true' && steps.existing_release.outputs.exists == 'false'
+              shell: bash
+              run: |
+                  test -f dist/main.js
+                  test -f manifest.json
+                  if [ -f styles.css ]; then
+                    test -s styles.css
+                  fi
+
+            - name: Create GitHub release
+              if: steps.version_change.outputs.changed == 'true' && steps.existing_release.outputs.exists == 'false'
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              shell: bash
+              run: |
+                  ASSETS=("dist/main.js" "manifest.json")
+                  if [ -f styles.css ]; then
+                    ASSETS+=("styles.css")
+                  fi
+
+                  gh release create "${{ steps.version_change.outputs.current_version }}" \
+                    "${ASSETS[@]}" \
+                    --title "${{ steps.version_change.outputs.current_version }}" \
+                    --generate-notes

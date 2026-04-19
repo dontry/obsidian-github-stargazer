@@ -1,17 +1,23 @@
-import { readFileSync, writeFileSync } from "fs";
+import { readFileSync, writeFileSync } from "node:fs";
+import {
+	synchronizeReleaseMetadata,
+	validateReleaseMetadata,
+} from "./scripts/versioning.mjs";
 
-const targetVersion = process.env.npm_package_version;
-
-// read minAppVersion from manifest.json and bump version to target version
+const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
 const manifest = JSON.parse(readFileSync("manifest.json", "utf8"));
-const { minAppVersion } = manifest;
-manifest.version = targetVersion;
-writeFileSync("manifest.json", JSON.stringify(manifest, null, "\t"));
+const versions = JSON.parse(readFileSync("versions.json", "utf8"));
 
-// update versions.json with target version and minAppVersion from manifest.json
-// but only if the target version is not already in versions.json
-const versions = JSON.parse(readFileSync('versions.json', 'utf8'));
-if (!Object.keys(versions).includes(targetVersion)) {
-    versions[targetVersion] = minAppVersion;
-    writeFileSync('versions.json', JSON.stringify(versions, null, '\t'));
+const synced = synchronizeReleaseMetadata(packageJson, manifest, versions);
+const errors = validateReleaseMetadata(
+	packageJson,
+	synced.manifest,
+	synced.versions,
+);
+
+if (errors.length > 0) {
+	throw new Error(`Release metadata is invalid:\n- ${errors.join("\n- ")}`);
 }
+
+writeFileSync("manifest.json", `${JSON.stringify(synced.manifest, null, "\t")}\n`);
+writeFileSync("versions.json", `${JSON.stringify(synced.versions, null, "\t")}\n`);

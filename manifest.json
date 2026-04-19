@@ -1,7 +1,7 @@
 {
 	"id": "obsidian-github-stargazer",
 	"name": "GitHub Stargazer",
-	"version": "1.0.3",
+	"version": "1.0.4",
 	"minAppVersion": "1.0.0",
 	"description": "Sync and manage your GitHub starred repositories in Obsidian with notes, tags, and custom organization",
 	"author": "dontry",

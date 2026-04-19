@@ -156,15 +156,19 @@ describe("FileManager - deleteRepositoryFiles", () => {
 	let mockApp: App;
 	let mockVault: any;
 
-	beforeEach(() => {
-		mockVault = {
-			adapter: {
-				remove: vi.fn(),
-				list: vi.fn(),
-				rmdir: vi.fn(),
-			},
-			getAbstractFileByPath: vi.fn(),
-		};
+		beforeEach(() => {
+			mockVault = {
+				adapter: {
+					exists: vi.fn().mockResolvedValue(true),
+					remove: vi.fn(),
+					list: vi.fn().mockResolvedValue({
+						files: ["facebook/react/placeholder.md"],
+						folders: [],
+					}),
+					rmdir: vi.fn(),
+				},
+				getAbstractFileByPath: vi.fn(),
+			};
 		mockApp = {
 			vault: mockVault,
 		} as unknown as App;

@@ -4,7 +4,7 @@
 	"description": "Sync and manage your GitHub starred repositories in Obsidian with notes, tags, and custom organization",
 	"main": "dist/main.js",
 	"type": "module",
-	"packageManager": "pnpm@9.0.0",
+	"packageManager": "pnpm@10.33.0+sha512.10568bb4a6afb58c9eb3630da90cc9516417abebd3fabbe6739f0ae795728da1491e9db5a544c76ad8eb7570f5c4bb3d6c637b2cb41bfdcdb47fa823c8649319",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
 		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
@@ -30,8 +30,8 @@
 	"devDependencies": {
 		"@eslint/js": "9.30.1",
 		"@types/node": "^20.11.0",
-		"@typescript-eslint/eslint-plugin": "^8.0.0",
-		"@typescript-eslint/parser": "^8.0.0",
+		"@typescript-eslint/eslint-plugin": "^8.58.2",
+		"@typescript-eslint/parser": "^8.58.2",
 		"@vitest/coverage-v8": "^2.0.0",
 		"@vitest/ui": "^2.0.0",
 		"esbuild": "0.25.5",
@@ -41,7 +41,7 @@
 		"jiti": "^2.6.1",
 		"tslib": "2.6.0",
 		"typescript": "^5.3.3",
-		"typescript-eslint": "8.35.1",
+		"typescript-eslint": "8.58.2",
 		"vitest": "^2.0.0"
 	},
 	"dependencies": {

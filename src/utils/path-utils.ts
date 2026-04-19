@@ -4,7 +4,8 @@
  * @module utils/path-utils
  */
 
-const MAX_PATH_SEGMENT_LENGTH = 200; // Further reduced to keep full path well under 500 chars
+const MAX_PATH_SEGMENT_LENGTH = 200; // Individual path segment cap
+const MAX_FULL_PATH_LENGTH = 499; // Keep generated paths below Windows MAX_PATH
 
 /**
  * Sanitize a path segment (owner or repository name) for cross-platform compatibility
@@ -42,10 +43,7 @@ export function sanitizePathSegment(segment: string): string {
  * @returns Relative path to metadata file (e.g., "owner/repo/owner-repo-metadata.md")
  */
 export function generateMetadataFilePath(owner: string, repo: string): string {
-	const sanitizedOwner = sanitizePathSegment(owner);
-	const sanitizedRepo = sanitizePathSegment(repo);
-	const fileName = `${sanitizedOwner}-${sanitizedRepo}-metadata.md`;
-	return `${sanitizedOwner}/${sanitizedRepo}/${fileName}`;
+	return generateRepositoryFilePath(owner, repo, "metadata.md");
 }
 
 /**
@@ -55,8 +53,36 @@ export function generateMetadataFilePath(owner: string, repo: string): string {
  * @returns Relative path to README file (e.g., "owner/repo/owner-repo-readme.md")
  */
 export function generateReadmeFilePath(owner: string, repo: string): string {
-	const sanitizedOwner = sanitizePathSegment(owner);
-	const sanitizedRepo = sanitizePathSegment(repo);
-	const fileName = `${sanitizedOwner}-${sanitizedRepo}-readme.md`;
+	return generateRepositoryFilePath(owner, repo, "readme.md");
+}
+
+function generateRepositoryFilePath(
+	owner: string,
+	repo: string,
+	suffix: "metadata.md" | "readme.md",
+): string {
+	let sanitizedOwner = sanitizePathSegment(owner);
+	let sanitizedRepo = sanitizePathSegment(repo);
+	let fileName = `${sanitizedOwner}-${sanitizedRepo}-${suffix}`;
+	let fullPath = `${sanitizedOwner}/${sanitizedRepo}/${fileName}`;
+
+	if (fullPath.length < MAX_FULL_PATH_LENGTH) {
+		return fullPath;
+	}
+
+	const overflow = fullPath.length - MAX_FULL_PATH_LENGTH + 1;
+	const repoBudget = Math.max(1, sanitizedRepo.length - overflow);
+	sanitizedRepo = sanitizedRepo.substring(0, repoBudget);
+	fileName = `${sanitizedOwner}-${sanitizedRepo}-${suffix}`;
+	fullPath = `${sanitizedOwner}/${sanitizedRepo}/${fileName}`;
+
+	if (fullPath.length < MAX_FULL_PATH_LENGTH) {
+		return fullPath;
+	}
+
+	const ownerOverflow = fullPath.length - MAX_FULL_PATH_LENGTH + 1;
+	const ownerBudget = Math.max(1, sanitizedOwner.length - ownerOverflow);
+	sanitizedOwner = sanitizedOwner.substring(0, ownerBudget);
+	fileName = `${sanitizedOwner}-${sanitizedRepo}-${suffix}`;
 	return `${sanitizedOwner}/${sanitizedRepo}/${fileName}`;
 }

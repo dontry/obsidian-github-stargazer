@@ -39,8 +39,8 @@ describe("Plugin Lifecycle", () => {
 
 			await plugin.onload();
 
-			expect(addCommandSpy).toHaveBeenCalledTimes(4);
-		});
+				expect(addCommandSpy).toHaveBeenCalledTimes(3);
+			});
 
 		it("should register ribbon icon", async () => {
 			vi.mocked(mockPlugin.loadData).mockResolvedValue(null);

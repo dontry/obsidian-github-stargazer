@@ -123,6 +123,35 @@ export class Modal {
 	onClose(): void {}
 }
 
+export type FuzzyMatch<T> = {
+	item: T;
+	match?: unknown;
+};
+
+export class FuzzySuggestModal<T> extends Modal {
+	private placeholder = "";
+
+	setPlaceholder(value: string): void {
+		this.placeholder = value;
+	}
+
+	getPlaceholder(): string {
+		return this.placeholder;
+	}
+
+	getItems(): T[] {
+		return [];
+	}
+
+	getItemText(_item: T): string {
+		return "";
+	}
+
+	onChooseItem(_item: T): void {}
+
+	renderSuggestion(_match: FuzzyMatch<T>, _el: HTMLElement): void {}
+}
+
 export class PluginSettingTab {
 	app: App;
 	plugin: Plugin;
@@ -213,6 +242,8 @@ export class Platform {
 	static isAndroidApp: boolean = false;
 	static isIosApp: boolean = false;
 }
+
+export const setIcon = vi.fn();
 
 export interface RequestUrlOptions {
 	url: string;

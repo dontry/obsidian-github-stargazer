@@ -144,6 +144,13 @@ Once synced, you can:
 - **Link Resources** - Attach links to blog posts, tutorials, or documentation related to the repository
 - **Search** - Quickly find repositories by name, tags, or notes
 
+### Files added to your vault
+
+For each synced repository, the plugin adds two markdown files to your vault:
+
+- **`README.md`** - A local copy of the repository README from GitHub. This gives you the project documentation directly inside Obsidian, so you can read, search, and link to it without leaving your vault.
+- **`metadata.md`** - A structured metadata note for the repository. It stores the repository details used to build your Obsidian Bases overview, so you can sort, filter, and review your starred repositories as a knowledge base.
+
 ## Development
 
 ### Prerequisites
@@ -212,12 +219,6 @@ tests/                  # Vitest test files
 ├── integration/       # Integration tests for workflows
 └── mocks/             # Mock implementations for testing
 
-docs/                   # Documentation
-├── constitution-compliance.md     # Code quality compliance report
-├── performance-verification.md    # Performance analysis
-├── quickstart-test-coverage.md    # Test coverage report
-├── sensitive-data-verification.md # Security audit
-└── checkpoint-location-verification.md # File location verification
 ```
 
 ## Contributing
@@ -229,15 +230,6 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
-
-## Code Quality
-
-This project uses:
-
-- **TypeScript** with strict mode for type safety
-- **ESLint** with Obsidian-specific rules for code quality
-- **Vitest** for unit testing
-- **esbuild** for fast, optimized builds
 
 ## License
 
